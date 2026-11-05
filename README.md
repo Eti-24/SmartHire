@@ -1,5 +1,7 @@
 # SmartHire
 
+Repository: [Eti-24/SmartHire](https://github.com/Eti-24/SmartHire) (private).
+
 SmartHire is a desktop recruitment application built with Java 21, Swing, and MySQL. Students upload and review their CVs, compare job matches, and track applications. Companies publish vacancies and review applicants. Administrators approve companies, job postings, and CV versions.
 
 Matching scores explain how each qualification contributes to the result. Mandatory requirements determine eligibility independently of the score. Applications retain the CV version, contact details, and assessment used at submission.

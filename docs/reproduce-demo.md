@@ -1,5 +1,18 @@
 # Reproducing and verifying the demo
 
+## Get the source
+
+The repository is private. Sign in to a GitHub account with access before cloning:
+
+```powershell
+git clone https://github.com/Eti-24/SmartHire.git
+Set-Location SmartHire
+```
+
+The default branch is `main`. In the existing checkout, `origin` points to this repository and `main` tracks `origin/main`. Run `git status` before updating, and use `git pull --ff-only` when the working tree is clean.
+
+Cloning provides the source, tests, documentation, and fictional demo files. Set up local tools and database credentials separately; `.tools`, `.local`, and `target` are excluded from Git. GitHub credentials are not part of the repository.
+
 ## Project and tools
 
 The root pom.xml builds Java 21 Swing/JDBC code; the main class is `smarthire.Main`. Open the root as a Maven project in NetBeans. No GUI Builder forms, web server or Python runtime are required for the app. On this laptop use PowerShell 7 and dot-source `scripts/dev-env.ps1` for the portable JDK, Maven and dependency cache. `scripts/start-netbeans.ps1` selects the same local JDK/cache.
