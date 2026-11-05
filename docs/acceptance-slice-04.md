@@ -1,0 +1,32 @@
+# Slice 04: explained job matching
+
+Slice 04 depends on publication (02) and confirmed CV review (03). It adds student recommendations using reviewed qualifications only. Applications and recruiter ranking are the next slice; policy administration and text similarity remain in 05b.
+
+## Run and inspect
+
+1. Start MySQL and launch through `scripts/run.ps1`; see the README for fictional demo accounts.
+2. Sign in as a student with no confirmed CV. Open **Job matches**. Expect a prompt to confirm a review in **My CV**, with no invented zero-qualification recommendations.
+3. Upload the fictional PDF/DOCX, review qualifications, and confirm. Return to **Job matches**. Only approved open postings from active verified companies appear.
+4. Select a row and choose **Open selected job**. Expect the existing full job-detail screen with description, location, salary, category, and requirements. **Back to matches** returns to refreshed recommendations. Opening must recheck job visibility, so an unavailable posting gives an error and retains the return button.
+5. Select a row and choose **Why this match?**. Expect a short score/eligibility summary, unmet mandatory requirements, category percentages, matched/missing qualifications, and improvement suggestions. Technical and soft skill types use readable labels. **Show score details** optionally reveals the policy version, CV review identifier, normalized weights, percentage-point contributions, counted experience months/tags, and all mandatory checks. The lower pane scrolls independently; its divider is adjustable.
+6. Compare an eligible low-score job with an ineligible high-score job. Eligible jobs come first; within each group, unrounded descending percentage and then stable job ID determine order. Rounded display ties need not have identical underlying percentages.
+7. Edit and confirm the CV, return, and refresh. Expect the new review identifier (under Show score details) and recalculated score. An unfinished/cancelled CV draft has no effect. Requesting an explanation rereads the current review and posting rather than trusting the row's earlier score.
+8. As the company, edit an approved posting. Before renewed approval it disappears from recommendations and cannot be opened through a stale result. Reapprove it as admin, then refresh as the student. Closing the posting, removing company verification, or disabling the company likewise removes access. Disabled students cannot calculate matches through existing sessions.
+9. Check a confirmed CV when no jobs are available. Expect a clear empty state. Check keyboard selection, Tab order, resizing and laptop screen fit, long explanations, and returning to overview during loading. Matching and database access run through `SwingWorker`; departed results do not update a replacement screen.
+
+## Calculation conventions
+
+- The immutable initial policy is `default-v1`: skills 40, education 20, experience 15, projects 15, certifications 10. Only categories with scored requirements participate; their weights are renormalized. Zero-month experience and relevance tags do not create scored categories. An incompatible zero active-weight total is rejected.
+- Required skills have weight two, optional skills weight one. Priority alone does not make a requirement mandatory. Canonical skill IDs and curated aliases use the existing vocabulary; Java/JavaScript and C/C++ remain distinct. Both technical and soft skills contribute to the skills category.
+- Degree order for this demonstration is SECONDARY < DIPLOMA < BACHELOR < MASTER < DOCTORATE. Education earns one only if both minimum degree and any specified field match. Field comparison uses Unicode NFKC, case folding and collapsed whitespace. **No field aliases or universal degree equivalences are inferred**: `CS` is different from `computer science`. Individual degree and field mandatory flags are assessed separately, as configured in the structured job form.
+- Relevant work must have at least one selected relevance tag. Count the union of inclusive calendar-month ranges; overlaps and duplicate ranges count once. For January–April plus March–June, the result is six months. Unrelated/untagged work adds none. Ongoing work uses its already frozen review end month, never today's date. Experience fraction is capped at one, and eligibility uses the same month count.
+- Requested project skills must appear in confirmed project evidence. General profile skills are insufficient. Project and certification fractions are matched distinct requirements divided by listed requirements. Certifications use NFKC/case/whitespace normalization and exact names; claims are not independently verified.
+- Eligibility is the conjunction of explicit mandatory checks, independent of weights or percentage. Missing evidence fails its mandatory requirement. Suggestions describe unmet requirements and are rule based.
+- Calculation uses unrounded double precision. The UI rounds to two decimals only for display. Each contribution records its fraction, normalized weight and percentage points. Scores indicate compatibility, not hiring probability.
+- No match cache is stored. Every entry, refresh, and detail-open request recalculates from current permitted data. A result is a point-in-time assessment, not permission to submit an application. Slice 05 must recheck under the job submission lock and preserve immutable submitted evidence; it can reuse the pure engine with a common current policy for recalculated rankings while retaining original results separately.
+
+## Verification record
+
+Automated checks cover exact arithmetic, all five categories, aliases, independent mandatory failures despite high percentages, missing evidence, overlap/adjacency/disjoint month ranges, caps, frozen ongoing dates, separate project evidence, normalized certifications/fields, absent categories, policy validation, and stable ordering. MySQL service checks exercise real parsed/confirmed CVs, replacement reviews, current requirement changes/reapproval, restart reads, closure, role restrictions, separate students, company verification/disablement, and disabled student sessions.
+
+The full test/package command and latest counts are recorded in `implementation-status.md`. Interactive Swing acceptance and screenshots remain pending: the computer-use Node runtime exited during initialization with `windows sandbox failed: helper_unknown_error: setup refresh had errors`. No interactive walkthrough or screen-fit check is claimed.

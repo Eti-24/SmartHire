@@ -1,0 +1,236 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2240" height="2700" viewBox="0 0 2240 2700">
+<title>SmartHire complete physical ER diagram</title>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#5e7e94"/></marker></defs>
+<rect width="2240" height="2700" fill="#f5f8fb"/>
+<g font-family="Segoe UI,Arial,sans-serif" fill="#17324d">
+<text x="60" y="55" font-size="32" font-weight="bold">SmartHire | complete physical ER diagram</text>
+<text x="60" y="87" font-size="18">23 tables | 25 foreign keys | PK = primary key; FK = foreign key | arrows: child to parent</text>
+<text x="60" y="116" font-size="17">All columns shown. Numbered relationships and composite keys are detailed in er-diagram.html. Zoom to read.</text>
+<path d="M290 570 C290 359,290 359,290 392" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="294" y="552" font-size="12">#1</text>
+<path d="M830 570 C830 351,290 351,290 392" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="834" y="540" font-size="12">#2</text>
+<path d="M1910 570 C1910 203,1910 203,1910 252" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="1914" y="564" font-size="12">#3</text>
+<path d="M830 990 C830 627,830 627,830 652" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="834" y="972" font-size="12">#4</text>
+<path d="M830 990 C830 199,830 199,830 232" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="834" y="960" font-size="12">#5</text>
+<path d="M1370 990 C1370 949,830 949,830 1232" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="1374" y="984" font-size="12">#6</text>
+<path d="M1370 570 C1370 521,290 521,290 632" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="1374" y="552" font-size="12">#7</text>
+<path d="M1370 570 C1370 307,1370 307,1370 332" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="1374" y="540" font-size="12">#8</text>
+<path d="M1370 1410 C1370 699,1370 699,1370 732" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="1374" y="1404" font-size="12">#9</text>
+<path d="M1910 990 C1910 691,1370 691,1370 732" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="1914" y="972" font-size="12">#10</text>
+<path d="M1910 990 C1910 203,1910 203,1910 252" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="1914" y="960" font-size="12">#11</text>
+<path d="M1910 1410 C1910 707,1370 707,1370 732" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="1914" y="1404" font-size="12">#12</text>
+<path d="M1910 1830 C1910 1559,1910 1559,1910 1592" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="1914" y="1812" font-size="12">#13</text>
+<path d="M1910 1830 C1910 211,1910 211,1910 252" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="1914" y="1800" font-size="12">#14</text>
+<path d="M1370 1830 C1370 683,1370 683,1370 732" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="1374" y="1824" font-size="12">#15</text>
+<path d="M830 1410 C830 707,1370 707,1370 732" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="834" y="1392" font-size="12">#16</text>
+<path d="M830 1410 C830 1199,830 1199,830 1232" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="834" y="1380" font-size="12">#17</text>
+<path d="M830 2250 C830 2209,290 2209,290 2432" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="834" y="2244" font-size="12">#18</text>
+<path d="M290 1830 C290 1183,830 1183,830 1232" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="294" y="1812" font-size="12">#19</text>
+<path d="M290 1830 C290 307,1370 307,1370 332" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="294" y="1800" font-size="12">#20</text>
+<path d="M290 1410 C290 1199,830 1199,830 1232" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="294" y="1404" font-size="12">#21</text>
+<path d="M290 1410 C290 291,1370 291,1370 332" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="294" y="1392" font-size="12">#22</text>
+<path d="M290 990 C290 343,290 343,290 392" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="294" y="960" font-size="12">#23</text>
+<path d="M830 1830 C830 707,1370 707,1370 732" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="834" y="1824" font-size="12">#24</text>
+<path d="M830 1830 C830 359,290 359,290 392" fill="none" stroke="#8daabd" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="834" y="1812" font-size="12">#25</text>
+<rect x="60" y="150" width="470" height="248" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M68 150 H522 Q530 150 530 158 V186 H60 V158 Q60 150 68 150" fill="#17324d"/>
+<text x="74" y="175" font-size="20" font-weight="bold" fill="white">users</text>
+<text x="74" y="208" font-size="16">id <tspan fill="#53738a">BIGINT PK</tspan></text>
+<text x="74" y="228" font-size="16">email <tspan fill="#53738a">VARCHAR(254) </tspan></text>
+<text x="74" y="248" font-size="16">password_hash <tspan fill="#53738a">VARCHAR(255) </tspan></text>
+<text x="74" y="268" font-size="16">role <tspan fill="#53738a">ENUM </tspan></text>
+<text x="74" y="288" font-size="16">active <tspan fill="#53738a">BOOLEAN </tspan></text>
+<text x="74" y="308" font-size="16">display_name <tspan fill="#53738a">VARCHAR(120) </tspan></text>
+<text x="74" y="328" font-size="16">phone <tspan fill="#53738a">VARCHAR(40) </tspan></text>
+<text x="74" y="348" font-size="16">affiliation <tspan fill="#53738a">VARCHAR(180) </tspan></text>
+<text x="74" y="368" font-size="16">about <tspan fill="#53738a">VARCHAR(2000) </tspan></text>
+<text x="74" y="388" font-size="16">created_at <tspan fill="#53738a">TIMESTAMP </tspan></text>
+<rect x="60" y="570" width="470" height="68" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M68 570 H522 Q530 570 530 578 V606 H60 V578 Q60 570 68 570" fill="#17324d"/>
+<text x="74" y="595" font-size="20" font-weight="bold" fill="white">students</text>
+<text x="74" y="628" font-size="16">user_id <tspan fill="#53738a">BIGINT PK,FK</tspan></text>
+<rect x="600" y="570" width="470" height="88" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M608 570 H1062 Q1070 570 1070 578 V606 H600 V578 Q600 570 608 570" fill="#17324d"/>
+<text x="614" y="595" font-size="20" font-weight="bold" fill="white">companies</text>
+<text x="614" y="628" font-size="16">user_id <tspan fill="#53738a">BIGINT PK,FK</tspan></text>
+<text x="614" y="648" font-size="16">verified <tspan fill="#53738a">BOOLEAN </tspan></text>
+<rect x="1140" y="2250" width="470" height="68" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M1148 2250 H1602 Q1610 2250 1610 2258 V2286 H1140 V2258 Q1140 2250 1148 2250" fill="#17324d"/>
+<text x="1154" y="2275" font-size="20" font-weight="bold" fill="white">job_catalog_lock</text>
+<text x="1154" y="2308" font-size="16">id <tspan fill="#53738a">INT PK</tspan></text>
+<rect x="600" y="150" width="470" height="88" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M608 150 H1062 Q1070 150 1070 158 V186 H600 V158 Q600 150 608 150" fill="#17324d"/>
+<text x="614" y="175" font-size="20" font-weight="bold" fill="white">categories</text>
+<text x="614" y="208" font-size="16">id <tspan fill="#53738a">BIGINT PK</tspan></text>
+<text x="614" y="228" font-size="16">name <tspan fill="#53738a">VARCHAR(100) </tspan></text>
+<rect x="1680" y="150" width="470" height="108" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M1688 150 H2142 Q2150 150 2150 158 V186 H1680 V158 Q1680 150 1688 150" fill="#17324d"/>
+<text x="1694" y="175" font-size="20" font-weight="bold" fill="white">skills</text>
+<text x="1694" y="208" font-size="16">id <tspan fill="#53738a">VARCHAR(80) PK</tspan></text>
+<text x="1694" y="228" font-size="16">name <tspan fill="#53738a">VARCHAR(180) </tspan></text>
+<text x="1694" y="248" font-size="16">type <tspan fill="#53738a">ENUM </tspan></text>
+<rect x="1680" y="570" width="470" height="88" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M1688 570 H2142 Q2150 570 2150 578 V606 H1680 V578 Q1680 570 1688 570" fill="#17324d"/>
+<text x="1694" y="595" font-size="20" font-weight="bold" fill="white">skill_aliases</text>
+<text x="1694" y="628" font-size="16">skill_id <tspan fill="#53738a">VARCHAR(80) PK,FK</tspan></text>
+<text x="1694" y="648" font-size="16">phrase <tspan fill="#53738a">VARCHAR(180) PK</tspan></text>
+<rect x="600" y="990" width="470" height="248" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M608 990 H1062 Q1070 990 1070 998 V1026 H600 V998 Q600 990 608 990" fill="#17324d"/>
+<text x="614" y="1015" font-size="20" font-weight="bold" fill="white">jobs</text>
+<text x="614" y="1048" font-size="16">id <tspan fill="#53738a">BIGINT PK</tspan></text>
+<text x="614" y="1068" font-size="16">company_id <tspan fill="#53738a">BIGINT FK</tspan></text>
+<text x="614" y="1088" font-size="16">title <tspan fill="#53738a">VARCHAR(160) </tspan></text>
+<text x="614" y="1108" font-size="16">description <tspan fill="#53738a">TEXT </tspan></text>
+<text x="614" y="1128" font-size="16">category_id <tspan fill="#53738a">BIGINT FK</tspan></text>
+<text x="614" y="1148" font-size="16">location <tspan fill="#53738a">VARCHAR(180) </tspan></text>
+<text x="614" y="1168" font-size="16">salary_min <tspan fill="#53738a">DECIMAL(12,2) </tspan></text>
+<text x="614" y="1188" font-size="16">salary_max <tspan fill="#53738a">DECIMAL(12,2) </tspan></text>
+<text x="614" y="1208" font-size="16">status <tspan fill="#53738a">ENUM </tspan></text>
+<text x="614" y="1228" font-size="16">decision <tspan fill="#53738a">VARCHAR(1000) </tspan></text>
+<rect x="1140" y="990" width="470" height="188" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M1148 990 H1602 Q1610 990 1610 998 V1026 H1140 V998 Q1140 990 1148 990" fill="#17324d"/>
+<text x="1154" y="1015" font-size="20" font-weight="bold" fill="white">job_requirements</text>
+<text x="1154" y="1048" font-size="16">job_id <tspan fill="#53738a">BIGINT PK,FK</tspan></text>
+<text x="1154" y="1068" font-size="16">ordinal <tspan fill="#53738a">INT PK</tspan></text>
+<text x="1154" y="1088" font-size="16">kind <tspan fill="#53738a">VARCHAR(30) </tspan></text>
+<text x="1154" y="1108" font-size="16">value <tspan fill="#53738a">VARCHAR(180) </tspan></text>
+<text x="1154" y="1128" font-size="16">months <tspan fill="#53738a">INT </tspan></text>
+<text x="1154" y="1148" font-size="16">priority <tspan fill="#53738a">ENUM </tspan></text>
+<text x="1154" y="1168" font-size="16">mandatory <tspan fill="#53738a">BOOLEAN </tspan></text>
+<rect x="1140" y="150" width="470" height="188" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M1148 150 H1602 Q1610 150 1610 158 V186 H1140 V158 Q1140 150 1148 150" fill="#17324d"/>
+<text x="1154" y="175" font-size="20" font-weight="bold" fill="white">managed_documents</text>
+<text x="1154" y="208" font-size="16">id <tspan fill="#53738a">CHAR(36) PK</tspan></text>
+<text x="1154" y="228" font-size="16">format <tspan fill="#53738a">ENUM </tspan></text>
+<text x="1154" y="248" font-size="16">original_name <tspan fill="#53738a">VARCHAR(255) </tspan></text>
+<text x="1154" y="268" font-size="16">byte_size <tspan fill="#53738a">BIGINT </tspan></text>
+<text x="1154" y="288" font-size="16">sha256 <tspan fill="#53738a">CHAR(64) </tspan></text>
+<text x="1154" y="308" font-size="16">extracted_text <tspan fill="#53738a">MEDIUMTEXT </tspan></text>
+<text x="1154" y="328" font-size="16">created_at <tspan fill="#53738a">TIMESTAMP </tspan></text>
+<rect x="1140" y="570" width="470" height="168" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M1148 570 H1602 Q1610 570 1610 578 V606 H1140 V578 Q1140 570 1148 570" fill="#17324d"/>
+<text x="1154" y="595" font-size="20" font-weight="bold" fill="white">cv_versions</text>
+<text x="1154" y="628" font-size="16">id <tspan fill="#53738a">CHAR(36) PK</tspan></text>
+<text x="1154" y="648" font-size="16">student_id <tspan fill="#53738a">BIGINT FK</tspan></text>
+<text x="1154" y="668" font-size="16">document_id <tspan fill="#53738a">CHAR(36) FK</tspan></text>
+<text x="1154" y="688" font-size="16">reviewed_at <tspan fill="#53738a">TIMESTAMP(6) </tspan></text>
+<text x="1154" y="708" font-size="16">degree <tspan fill="#53738a">VARCHAR(20) </tspan></text>
+<text x="1154" y="728" font-size="16">degree_field <tspan fill="#53738a">VARCHAR(180) </tspan></text>
+<rect x="1140" y="1410" width="470" height="88" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M1148 1410 H1602 Q1610 1410 1610 1418 V1446 H1140 V1418 Q1140 1410 1148 1410" fill="#17324d"/>
+<text x="1154" y="1435" font-size="20" font-weight="bold" fill="white">cv_current</text>
+<text x="1154" y="1468" font-size="16">student_id <tspan fill="#53738a">BIGINT PK,FK</tspan></text>
+<text x="1154" y="1488" font-size="16">version_id <tspan fill="#53738a">CHAR(36) FK</tspan></text>
+<rect x="1680" y="990" width="470" height="108" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M1688 990 H2142 Q2150 990 2150 998 V1026 H1680 V998 Q1680 990 1688 990" fill="#17324d"/>
+<text x="1694" y="1015" font-size="20" font-weight="bold" fill="white">cv_skills</text>
+<text x="1694" y="1048" font-size="16">version_id <tspan fill="#53738a">CHAR(36) PK,FK</tspan></text>
+<text x="1694" y="1068" font-size="16">ordinal <tspan fill="#53738a">INT PK</tspan></text>
+<text x="1694" y="1088" font-size="16">skill_id <tspan fill="#53738a">VARCHAR(80) FK</tspan></text>
+<rect x="1680" y="1410" width="470" height="188" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M1688 1410 H2142 Q2150 1410 2150 1418 V1446 H1680 V1418 Q1680 1410 1688 1410" fill="#17324d"/>
+<text x="1694" y="1435" font-size="20" font-weight="bold" fill="white">cv_evidence</text>
+<text x="1694" y="1468" font-size="16">version_id <tspan fill="#53738a">CHAR(36) PK,FK</tspan></text>
+<text x="1694" y="1488" font-size="16">kind <tspan fill="#53738a">ENUM PK</tspan></text>
+<text x="1694" y="1508" font-size="16">ordinal <tspan fill="#53738a">INT PK</tspan></text>
+<text x="1694" y="1528" font-size="16">evidence <tspan fill="#53738a">VARCHAR(2000) </tspan></text>
+<text x="1694" y="1548" font-size="16">start_month <tspan fill="#53738a">CHAR(7) </tspan></text>
+<text x="1694" y="1568" font-size="16">end_month <tspan fill="#53738a">CHAR(7) </tspan></text>
+<text x="1694" y="1588" font-size="16">ongoing <tspan fill="#53738a">BOOLEAN </tspan></text>
+<rect x="1680" y="1830" width="470" height="148" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M1688 1830 H2142 Q2150 1830 2150 1838 V1866 H1680 V1838 Q1680 1830 1688 1830" fill="#17324d"/>
+<text x="1694" y="1855" font-size="20" font-weight="bold" fill="white">cv_evidence_skills</text>
+<text x="1694" y="1888" font-size="16">version_id <tspan fill="#53738a">CHAR(36) PK,FK</tspan></text>
+<text x="1694" y="1908" font-size="16">kind <tspan fill="#53738a">ENUM PK,FK</tspan></text>
+<text x="1694" y="1928" font-size="16">evidence_ordinal <tspan fill="#53738a">INT PK,FK</tspan></text>
+<text x="1694" y="1948" font-size="16">ordinal <tspan fill="#53738a">INT PK</tspan></text>
+<text x="1694" y="1968" font-size="16">skill_id <tspan fill="#53738a">VARCHAR(80) FK</tspan></text>
+<rect x="1140" y="1830" width="470" height="108" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M1148 1830 H1602 Q1610 1830 1610 1838 V1866 H1140 V1838 Q1140 1830 1148 1830" fill="#17324d"/>
+<text x="1154" y="1855" font-size="20" font-weight="bold" fill="white">cv_certifications</text>
+<text x="1154" y="1888" font-size="16">version_id <tspan fill="#53738a">CHAR(36) PK,FK</tspan></text>
+<text x="1154" y="1908" font-size="16">ordinal <tspan fill="#53738a">INT PK</tspan></text>
+<text x="1154" y="1928" font-size="16">name <tspan fill="#53738a">VARCHAR(180) </tspan></text>
+<rect x="600" y="1410" width="470" height="328" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M608 1410 H1062 Q1070 1410 1070 1418 V1446 H600 V1418 Q600 1410 608 1410" fill="#17324d"/>
+<text x="614" y="1435" font-size="20" font-weight="bold" fill="white">applications</text>
+<text x="614" y="1468" font-size="16">id <tspan fill="#53738a">CHAR(36) PK</tspan></text>
+<text x="614" y="1488" font-size="16">student_id <tspan fill="#53738a">BIGINT FK</tspan></text>
+<text x="614" y="1508" font-size="16">job_id <tspan fill="#53738a">BIGINT FK</tspan></text>
+<text x="614" y="1528" font-size="16">cv_version_id <tspan fill="#53738a">CHAR(36) FK</tspan></text>
+<text x="614" y="1548" font-size="16">submitted_at <tspan fill="#53738a">TIMESTAMP(6) </tspan></text>
+<text x="614" y="1568" font-size="16">status <tspan fill="#53738a">ENUM </tspan></text>
+<text x="614" y="1588" font-size="16">student_name <tspan fill="#53738a">VARCHAR(120) </tspan></text>
+<text x="614" y="1608" font-size="16">student_email <tspan fill="#53738a">VARCHAR(254) </tspan></text>
+<text x="614" y="1628" font-size="16">student_phone <tspan fill="#53738a">VARCHAR(40) </tspan></text>
+<text x="614" y="1648" font-size="16">student_affiliation <tspan fill="#53738a">VARCHAR(180) </tspan></text>
+<text x="614" y="1668" font-size="16">student_about <tspan fill="#53738a">VARCHAR(2000) </tspan></text>
+<text x="614" y="1688" font-size="16">original_policy <tspan fill="#53738a">VARCHAR(80) </tspan></text>
+<text x="614" y="1708" font-size="16">original_score <tspan fill="#53738a">DOUBLE </tspan></text>
+<text x="614" y="1728" font-size="16">original_explanation <tspan fill="#53738a">MEDIUMTEXT </tspan></text>
+<rect x="60" y="2250" width="470" height="188" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M68 2250 H522 Q530 2250 530 2258 V2286 H60 V2258 Q60 2250 68 2250" fill="#17324d"/>
+<text x="74" y="2275" font-size="20" font-weight="bold" fill="white">scoring_policies</text>
+<text x="74" y="2308" font-size="16">version <tspan fill="#53738a">VARCHAR(80) PK</tspan></text>
+<text x="74" y="2328" font-size="16">skills <tspan fill="#53738a">INT </tspan></text>
+<text x="74" y="2348" font-size="16">education <tspan fill="#53738a">INT </tspan></text>
+<text x="74" y="2368" font-size="16">experience <tspan fill="#53738a">INT </tspan></text>
+<text x="74" y="2388" font-size="16">projects <tspan fill="#53738a">INT </tspan></text>
+<text x="74" y="2408" font-size="16">certifications <tspan fill="#53738a">INT </tspan></text>
+<text x="74" y="2428" font-size="16">created_at <tspan fill="#53738a">TIMESTAMP(6) </tspan></text>
+<rect x="600" y="2250" width="470" height="88" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M608 2250 H1062 Q1070 2250 1070 2258 V2286 H600 V2258 Q600 2250 608 2250" fill="#17324d"/>
+<text x="614" y="2275" font-size="20" font-weight="bold" fill="white">scoring_policy_current</text>
+<text x="614" y="2308" font-size="16">id <tspan fill="#53738a">INT PK</tspan></text>
+<text x="614" y="2328" font-size="16">version <tspan fill="#53738a">VARCHAR(80) FK</tspan></text>
+<rect x="60" y="1830" width="470" height="88" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M68 1830 H522 Q530 1830 530 1838 V1866 H60 V1838 Q60 1830 68 1830" fill="#17324d"/>
+<text x="74" y="1855" font-size="20" font-weight="bold" fill="white">job_circular_versions</text>
+<text x="74" y="1888" font-size="16">job_id <tspan fill="#53738a">BIGINT PK,FK</tspan></text>
+<text x="74" y="1908" font-size="16">document_id <tspan fill="#53738a">CHAR(36) PK,FK</tspan></text>
+<rect x="60" y="1410" width="470" height="88" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M68 1410 H522 Q530 1410 530 1418 V1446 H60 V1418 Q60 1410 68 1410" fill="#17324d"/>
+<text x="74" y="1435" font-size="20" font-weight="bold" fill="white">job_circulars</text>
+<text x="74" y="1468" font-size="16">job_id <tspan fill="#53738a">BIGINT PK,FK</tspan></text>
+<text x="74" y="1488" font-size="16">document_id <tspan fill="#53738a">CHAR(36) FK</tspan></text>
+<rect x="60" y="990" width="470" height="148" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M68 990 H522 Q530 990 530 998 V1026 H60 V998 Q60 990 68 990" fill="#17324d"/>
+<text x="74" y="1015" font-size="20" font-weight="bold" fill="white">notifications</text>
+<text x="74" y="1048" font-size="16">id <tspan fill="#53738a">CHAR(36) PK</tspan></text>
+<text x="74" y="1068" font-size="16">user_id <tspan fill="#53738a">BIGINT FK</tspan></text>
+<text x="74" y="1088" font-size="16">message <tspan fill="#53738a">VARCHAR(1000) </tspan></text>
+<text x="74" y="1108" font-size="16">created_at <tspan fill="#53738a">TIMESTAMP(6) </tspan></text>
+<text x="74" y="1128" font-size="16">read_at <tspan fill="#53738a">TIMESTAMP(6) </tspan></text>
+<rect x="600" y="1830" width="470" height="148" rx="8" fill="white" stroke="#a6becd"/>
+<path d="M608 1830 H1062 Q1070 1830 1070 1838 V1866 H600 V1838 Q600 1830 608 1830" fill="#17324d"/>
+<text x="614" y="1855" font-size="20" font-weight="bold" fill="white">cv_approvals</text>
+<text x="614" y="1888" font-size="16">version_id <tspan fill="#53738a">CHAR(36) PK,FK</tspan></text>
+<text x="614" y="1908" font-size="16">status <tspan fill="#53738a">ENUM </tspan></text>
+<text x="614" y="1928" font-size="16">reason <tspan fill="#53738a">VARCHAR(1000) </tspan></text>
+<text x="614" y="1948" font-size="16">reviewer_id <tspan fill="#53738a">BIGINT FK</tspan></text>
+<text x="614" y="1968" font-size="16">decided_at <tspan fill="#53738a">TIMESTAMP(6) </tspan></text>
+</g></svg>

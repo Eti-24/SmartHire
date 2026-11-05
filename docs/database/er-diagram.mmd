@@ -1,0 +1,180 @@
+erDiagram
+    users ||--o| students : references
+    users ||--o| companies : references
+    skills ||--o{ skill_aliases : references
+    companies ||--o{ jobs : references
+    categories ||--o{ jobs : references
+    jobs ||--o{ job_requirements : references
+    students ||--o{ cv_versions : references
+    managed_documents ||--o{ cv_versions : references
+    cv_versions ||--o| cv_current : references
+    cv_versions ||--o{ cv_skills : references
+    skills ||--o{ cv_skills : references
+    cv_versions ||--o{ cv_evidence : references
+    cv_evidence ||--o{ cv_evidence_skills : references
+    skills ||--o{ cv_evidence_skills : references
+    cv_versions ||--o{ cv_certifications : references
+    cv_versions ||--o{ applications : references
+    jobs ||--o{ applications : references
+    scoring_policies ||--o{ scoring_policy_current : references
+    jobs ||--o{ job_circular_versions : references
+    managed_documents ||--o{ job_circular_versions : references
+    jobs ||--o| job_circulars : references
+    managed_documents ||--o{ job_circulars : references
+    users ||--o{ notifications : references
+    cv_versions ||--o| cv_approvals : references
+    users o|--o{ cv_approvals : references
+    users {
+        BIGINT id PK
+        VARCHAR email
+        VARCHAR password_hash
+        ENUM role
+        BOOLEAN active
+        VARCHAR display_name
+        VARCHAR phone
+        VARCHAR affiliation
+        VARCHAR about
+        TIMESTAMP created_at
+    }
+    students {
+        BIGINT user_id PK,FK
+    }
+    companies {
+        BIGINT user_id PK,FK
+        BOOLEAN verified
+    }
+    job_catalog_lock {
+        INT id PK
+    }
+    categories {
+        BIGINT id PK
+        VARCHAR name
+    }
+    skills {
+        VARCHAR id PK
+        VARCHAR name
+        ENUM type
+    }
+    skill_aliases {
+        VARCHAR skill_id PK,FK
+        VARCHAR phrase PK
+    }
+    jobs {
+        BIGINT id PK
+        BIGINT company_id FK
+        VARCHAR title
+        TEXT description
+        BIGINT category_id FK
+        VARCHAR location
+        DECIMAL salary_min
+        DECIMAL salary_max
+        ENUM status
+        VARCHAR decision
+    }
+    job_requirements {
+        BIGINT job_id PK,FK
+        INT ordinal PK
+        VARCHAR kind
+        VARCHAR value
+        INT months
+        ENUM priority
+        BOOLEAN mandatory
+    }
+    managed_documents {
+        CHAR id PK
+        ENUM format
+        VARCHAR original_name
+        BIGINT byte_size
+        CHAR sha256
+        MEDIUMTEXT extracted_text
+        TIMESTAMP created_at
+    }
+    cv_versions {
+        CHAR id PK
+        BIGINT student_id FK
+        CHAR document_id FK
+        TIMESTAMP reviewed_at
+        VARCHAR degree
+        VARCHAR degree_field
+    }
+    cv_current {
+        BIGINT student_id PK,FK
+        CHAR version_id FK
+    }
+    cv_skills {
+        CHAR version_id PK,FK
+        INT ordinal PK
+        VARCHAR skill_id FK
+    }
+    cv_evidence {
+        CHAR version_id PK,FK
+        ENUM kind PK
+        INT ordinal PK
+        VARCHAR evidence
+        CHAR start_month
+        CHAR end_month
+        BOOLEAN ongoing
+    }
+    cv_evidence_skills {
+        CHAR version_id PK,FK
+        ENUM kind PK,FK
+        INT evidence_ordinal PK,FK
+        INT ordinal PK
+        VARCHAR skill_id FK
+    }
+    cv_certifications {
+        CHAR version_id PK,FK
+        INT ordinal PK
+        VARCHAR name
+    }
+    applications {
+        CHAR id PK
+        BIGINT student_id FK
+        BIGINT job_id FK
+        CHAR cv_version_id FK
+        TIMESTAMP submitted_at
+        ENUM status
+        VARCHAR student_name
+        VARCHAR student_email
+        VARCHAR student_phone
+        VARCHAR student_affiliation
+        VARCHAR student_about
+        VARCHAR original_policy
+        DOUBLE original_score
+        MEDIUMTEXT original_explanation
+    }
+    scoring_policies {
+        VARCHAR version PK
+        INT skills
+        INT education
+        INT experience
+        INT projects
+        INT certifications
+        TIMESTAMP created_at
+    }
+    scoring_policy_current {
+        INT id PK
+        VARCHAR version FK
+    }
+    job_circular_versions {
+        BIGINT job_id PK,FK
+        CHAR document_id PK,FK
+    }
+    job_circulars {
+        BIGINT job_id PK,FK
+        CHAR document_id FK
+    }
+    notifications {
+        CHAR id PK
+        BIGINT user_id FK
+        VARCHAR message
+        TIMESTAMP created_at
+        TIMESTAMP read_at
+    }
+    cv_approvals {
+        CHAR version_id PK,FK
+        ENUM status
+        VARCHAR reason
+        BIGINT reviewer_id FK
+        TIMESTAMP decided_at
+    }

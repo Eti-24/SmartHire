@@ -1,0 +1,32 @@
+package smarthire.jobs;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import smarthire.skills.Skill;
+import smarthire.documents.StoredDocument;
+import smarthire.matching.ScoringPolicy;
+
+/** One transaction per operation; writes lock the posting before changing it. */
+public interface JobRepository {
+    <T> T transaction(Function<Store, T> work);
+
+    interface Store {
+        boolean active(long userId);
+        List<Job.Company> companies();
+        void verify(long companyId, boolean verified);
+        List<Job.Category> categories();
+        long saveCategory(long id, String name);
+        List<Skill> skills();
+        void saveSkill(Skill skill);
+        List<Job> jobs();
+        Optional<Job> lockJob(long id);
+        boolean hasApplications(long jobId);
+        ScoringPolicy activePolicy();
+        void activatePolicy(ScoringPolicy policy);
+        Optional<StoredDocument> circular(long jobId);
+        void attach(long jobId, StoredDocument document);
+        long saveJob(long companyId, long id, Job.Details details);
+        void status(long id, Job.Status status, String decision);
+    }
+}
