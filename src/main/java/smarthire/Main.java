@@ -2,7 +2,6 @@ package smarthire;
 
 import java.nio.file.Path;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
 import smarthire.identity.IdentityService;
 import smarthire.identity.UserError;
 import smarthire.storage.Database;
@@ -15,7 +14,8 @@ public final class Main {
 
     private static synchronized void initializeDocuments(Database database) {
         if (documents != null) { return; }
-        var opened = new smarthire.documents.ManagedDocuments(Path.of(".local/documents"), new smarthire.storage.JdbcDocumentReferences(database));
+        Path documentRoot = Path.of(System.getProperty("smarthire.documents", ".local/documents"));
+        var opened = new smarthire.documents.ManagedDocuments(documentRoot, new smarthire.storage.JdbcDocumentReferences(database));
         try {
             var recovery = opened.reconcile();
             if (!recovery.unavailableReferences().isEmpty()) {
@@ -32,9 +32,14 @@ public final class Main {
             try {
                 Database database = Database.load(config, false);
                 database.initialize();
-                DemoSeed.provision(new JdbcAccounts(database));
+                var accounts = new JdbcAccounts(database);
+                if (database.isCloud()) {
+                    DemoSeed.provisionCloud(accounts, config.resolveSibling("aiven-demo-accounts.properties"));
+                } else {
+                    DemoSeed.provision(accounts);
+                }
                 DemoJobs.provision(database);
-                System.out.println("Fictional demo accounts are ready. Existing accounts were preserved.");
+                System.out.println("Fictional demo accounts and jobs are ready. Existing records were preserved.");
             } catch (UserError exception) {
                 System.err.println(exception.getMessage());
                 System.exit(1);
@@ -42,8 +47,6 @@ public final class Main {
             return;
         }
         SwingUtilities.invokeLater(() -> {
-            UIManager.put("Panel.background", java.awt.Color.WHITE);
-            UIManager.put("Label.font", new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 14));
             SmartHireWindow window = new SmartHireWindow();
             window.setVisible(true);
             window.connect(() -> {
@@ -54,7 +57,7 @@ public final class Main {
             }, identity -> new smarthire.jobs.JobService(identity, new smarthire.storage.JdbcJobs(Database.load(config, false)), documents),
                     identity -> new smarthire.cv.CvService(identity, new smarthire.storage.JdbcCvs(Database.load(config, false)), documents),
                     identity -> new smarthire.applications.ApplicationService(identity, new smarthire.storage.JdbcApplications(Database.load(config, false)), documents),
-                    identity -> new smarthire.workspace.WorkspaceService(identity, new smarthire.storage.JdbcWorkspace(Database.load(config, false))),
+                    identity -> new smarthire.workspace.WorkspaceService(identity, new smarthire.storage.JdbcWorkspace(Database.load(config, false)), documents),
                     identity -> new smarthire.cv.CvApprovalService(identity, new smarthire.storage.JdbcCvApprovals(Database.load(config, false)), documents));
         });
     }

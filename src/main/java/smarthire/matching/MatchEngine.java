@@ -21,6 +21,7 @@ public final class MatchEngine {
     public MatchResult assess(CvProfile.Qualifications cv, Job.Details job, SkillVocabulary vocabulary, ScoringPolicy policy) {
         var buckets = new EnumMap<ScoringPolicy.Category, Bucket>(ScoringPolicy.Category.class);
         var checks = new ArrayList<MatchResult.MandatoryCheck>();
+        var gaps = new ArrayList<MatchResult.Gap>();
         var suggestions = new ArrayList<String>();
         Set<String> skills = canonicalSkills(cv.skills(), vocabulary);
         Set<String> projectSkills = new HashSet<>();
@@ -63,6 +64,7 @@ public final class MatchEngine {
                     satisfied = fieldSatisfied;
                     label = "Degree field: " + r.value();
                     if (r.mandatory()) { checks.add(new MatchResult.MandatoryCheck(label, satisfied)); }
+                    if (!satisfied) { gaps.add(new MatchResult.Gap(r.kind(), label, r.mandatory())); }
                     continue;
                 }
                 case EXPERIENCE -> {
@@ -91,6 +93,7 @@ public final class MatchEngine {
                 (fieldSatisfied ? bucket.matched : bucket.missing).add("Degree field: " + field.value());
             }
             if (r.mandatory()) { checks.add(new MatchResult.MandatoryCheck(label, satisfied)); }
+            if (!satisfied) { gaps.add(new MatchResult.Gap(r.kind(), label, r.mandatory())); }
         }
         long totalWeight = buckets.keySet().stream().mapToLong(c -> policy.weights().getOrDefault(c, 0)).sum();
         if (totalWeight <= 0) { throw new UserError("Active job requirements have no positive scoring weight."); }
@@ -105,7 +108,7 @@ public final class MatchEngine {
             contributions.add(new MatchResult.Contribution(entry.getKey(), fraction, normalizedWeight, points, b.matched, b.missing));
         }
         return new MatchResult(policy.version(), score, contributions, checks, suggestions, months,
-                tags.stream().map(id -> vocabulary.findById(id).orElseThrow().name()).toList());
+                tags.stream().map(id -> vocabulary.findById(id).orElseThrow().name()).toList(), gaps);
     }
 
     private static long relevantMonths(List<CvProfile.Experience> entries, Set<String> tags, SkillVocabulary vocabulary) {

@@ -15,11 +15,18 @@ public interface JobRepository {
         boolean active(long userId);
         List<Job.Company> companies();
         void verify(long companyId, boolean verified);
+        void audit(long adminId, smarthire.workspace.AdminActivity.Change change);
         List<Job.Category> categories();
         long saveCategory(long id, String name);
         List<Skill> skills();
         void saveSkill(Skill skill);
         List<Job> jobs();
+        List<Job> unfilledJobs();
+        List<Job.HiringRecord> hiringHistory(Long companyId);
+        List<Job.CompanyHire> companyHires(long companyId);
+        List<JobService.SavedJob> savedJobs(long studentId);
+        void saveBookmark(long studentId, Job job);
+        void removeBookmark(long studentId, long jobId);
         Optional<Job> lockJob(long id);
         boolean hasApplications(long jobId);
         ScoringPolicy activePolicy();

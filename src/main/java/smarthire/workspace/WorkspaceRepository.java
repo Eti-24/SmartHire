@@ -28,6 +28,9 @@ public interface WorkspaceRepository {
         boolean markRead(long userId, UUID noticeId);
         List<AccountSummary> accounts();
         void setActive(long id, boolean active);
+        AdminData.Store adminData();
+        void audit(long adminId, AdminActivity.Change change);
+        AdminActivity.Page activity(AdminActivity.Filter filter);
         List<ApplicationSummary> monitor(Filter filter);
         Dashboard dashboard(long userId, Role role);
     }

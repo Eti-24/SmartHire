@@ -96,3 +96,36 @@ The user subsequently requested admin CV approval before applying. Added a separ
 The requested Bangladeshi fictional names are now used in the three demo CVs (Tanvir Ahmed, Nusrat Jahan, Arafat Hasan) and future seeded profiles (Arafat Hasan, Dhaka Software Demo, Farhana Rahman). Two unchanged local default demo profiles were renamed; custom profile names and saved application snapshots were retained. Regenerated PDFs were visually checked, and the real-sample score test plus isolated clean-database workflow passed again with packaging.
 
 Run the laptop journey in `docs/demo-guide.md` and the slice acceptance guides: all three roles, keyboard/tab navigation, display scaling/screen fit, upload responsiveness, comparison, file chooser/download/overwrite behavior, notification dialogs, admin filters and database retry. No requested feature slice remains undeveloped; these live checks remain unverified. Do not describe them as passed merely because service tests pass.
+
+## Swing redesign checkpoint
+
+The signed-in workspace now keeps role navigation visible. Job matches, Applicants and CV review use a selectable list, an adjacent preview and a separate detail view. Job matches gives eligibility and mandatory gaps priority over score and displays CV approval separately. Applicants separates current-policy match from the original assessment. CV review keeps original-file access and decisions on the exact confirmed version. See [the redesign brief](ui-redesign-brief.md) for the wider rollout.
+
+- Offline packaging passed with 40 unit tests. The integration package run passed 43 MySQL tests with the optional clean-database smoke skipped.
+- A Swing smoke harness used fictional records in `smarthire_test` to drive the three screens at default sizing and at a compact window with Java UI scaling set to 125%. It checked persistent navigation, a visible 85.71% mandatory failure with separate pending CV approval, preview selection, keyboard traversal to the match table, enabled actions, loading and empty match states, invalid filter feedback, applicant assessment labels, and reachability of CV decision controls.
+- The checkpoint was followed by the remaining Swing layout work below.
+
+## Remaining Swing screens
+
+The dashboard now presents role-specific counts and an application-status chart. Job lists, CV history, notifications, account access, and application monitoring use a list and preview. Posting details group requirements and circular access in tabs. The job and CV editors keep submission controls in view while users switch sections. Account forms and the administration tools use the shared styles, with company verification, categories, skills, and matching weights grouped under **Jobs and administration**.
+
+- Packaging passed with 40 unit tests and 43 MySQL integration tests. The optional clean-database smoke was skipped. Packaging and unit tests passed again after the final layout adjustments.
+- The Swing smoke harness used fictional MySQL records at default sizing and in a compact window with Java UI scaling set to 125%. It checked startup retry, account forms, job search and empty results, editor actions, CV draft cancellation, notification read state, protected admin accounts, read-only monitoring, catalog form reachability, and the three original checkpoint screens.
+- Physical-laptop acceptance and the file chooser upload, download, and overwrite interactions remain pending. The smoke harness checked the placement of submit and decision controls. It used test sessions and did not execute the full demo sign-in and decision sequence through Windows input.
+
+## Swing workflow follow-up
+
+- `scripts/verify.ps1 -Offline -CleanDatabaseSmoke` passed all 84 checks with zero failures, errors or skips. That includes 40 unit tests, 43 MySQL integration tests, and the isolated fresh-database smoke. Packaging and runtime classpath generation succeeded.
+- A separate Swing harness at 125% Java UI scaling in a 1090 × 600 window used the normal sign-in form for all three roles with fictional records in `smarthire_test`. It exercised the actual Swing file chooser with an eligible PDF and a textless PDF, confirmed a new CV version, and verified that declining overwrite preserves the destination bytes and accepting it saves the exact original PDF. It cancelled and confirmed the approval prompt for the same CV version, opened the job comparison, submitted the approved CV, and verified that shortlist and hire persisted and removed the recruiter decision controls.
+- The harness invoked Swing controls programmatically. The Windows desktop helper could inspect an existing older SmartHire window but could not see the isolated build. Physical 1366 × 768 acceptance with Windows input, including keyboard focus, chooser interaction and startup through the normal launcher, remains open.
+
+The user accepted the redesign after reviewing these results.
+
+## Feature expansion, slices 08–13
+
+Delivered Saved jobs, the matching improvement checklist, interview scheduling, recruiter notes and scorecards, the admin Activity log, and multiple vacancies. The [expansion plan](feature-expansion-plan.md) describes the service rules and sequence. The [demo guide](demo-guide.md) gives the three-role walkthrough.
+
+- `scripts/verify.ps1 -Offline -CleanDatabaseSmoke` passed 100 checks with no failures, errors, or skips. This includes 41 unit tests, 58 MySQL integration tests, and one isolated smoke covering fresh installation, the pre-vacancy column layout, interrupted upgrade, and repeated startup. Packaging and runtime classpath generation succeeded.
+- Existing postings default to one vacancy. The migration keeps legacy hires and application evidence and leaves their unknown hire time empty. Current-posting capacity derives from committed hired applications. The final hire removes the posting from discovery and cancels other outstanding interview actions without changing those application statuses.
+- Admin erase/export scopes include the new dependent records. The Activity log retains minimal identifiers after target erasure and reports unresolved export outcomes when the final audit write fails after the file is saved. No live demonstration records were used in the verification.
+- A Swing harness at 125% scaling in a 1090 × 600 window signed in through the normal form as all three roles. It saved a job and opened the owned application, inspected the checklist, proposed and accepted an interview, saved a recruiter note, followed company hiring history to an application, and opened the admin Activity log. It also checked that the two-vacancy posting stayed visible after the first hire and entered student Hiring history after the second. Physical Windows input and laptop acceptance remain pending.

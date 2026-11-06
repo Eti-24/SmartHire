@@ -12,7 +12,9 @@ import org.junit.jupiter.api.io.TempDir;
 import smarthire.WorkflowFixture;
 import smarthire.identity.UserError;
 import smarthire.jobs.*;
+import smarthire.matching.MatchService;
 import smarthire.storage.*;
+import smarthire.workspace.WorkspaceService;
 import static org.junit.jupiter.api.Assertions.*;
 
 @EnabledIfSystemProperty(named = "smarthire.integration", matches = "true")
@@ -126,6 +128,64 @@ class ApplicationIntegrationTest {
             assertNotEquals(first.get(15, TimeUnit.SECONDS), second.get(15, TimeUnit.SECONDS));
             assertEquals(1, f.applications.list(f.company, job, null).size());
         }
+    }
+
+    @Test void filledPostingsLeaveStudentDiscoveryAndAppearInRoleScopedHistory() {
+        long job = f.publish();
+        long closed = f.publish();
+        f.jobs.close(f.company, closed);
+        f.confirm(f.student, List.of(f.skill));
+        f.confirm(f.secondStudent, List.of(f.skill));
+        var matches = new MatchService(f.identity, f.cvs, f.jobs);
+        var workspace = new WorkspaceService(f.identity, new JdbcWorkspace(f.database));
+        var application = f.applications.apply(f.student, job);
+        f.applications.transition(f.company, application.id(), Application.Status.SHORTLISTED);
+        assertEquals(job, matches.open(f.secondStudent, job).job().id());
+        assertTrue(f.jobs.hiringHistory(f.company).isEmpty());
+        long availableBefore = workspace.dashboard(f.secondStudent).counts().get("Available jobs");
+
+        f.applications.transition(f.company, application.id(), Application.Status.HIRED);
+
+        var restartedJobs = new JobService(f.identity, new JdbcJobs(f.database), f.documents);
+        assertTrue(restartedJobs.list(f.secondStudent, "", f.category).isEmpty());
+        assertFalse(matches.recommend(f.secondStudent).jobs().stream().anyMatch(match -> match.job().id() == job));
+        assertThrows(UserError.class, () -> matches.open(f.secondStudent, job));
+        assertThrows(UserError.class, () -> restartedJobs.circular(f.secondStudent, job));
+        assertTrue(assertThrows(UserError.class, () -> f.applications.apply(f.secondStudent, job)).getMessage().contains("filled"));
+        assertEquals(availableBefore - 1, workspace.dashboard(f.secondStudent).counts().get("Available jobs"));
+
+        var companyHistory = restartedJobs.hiringHistory(f.company);
+        assertEquals(List.of(job), companyHistory.stream().map(Job.HiringRecord::jobId).toList());
+        assertTrue(restartedJobs.hiringHistory(f.secondStudent).contains(companyHistory.getFirst()));
+        assertTrue(restartedJobs.hiringHistory(f.foreignCompany).isEmpty());
+        assertThrows(UserError.class, () -> restartedJobs.hiringHistory(f.admin));
+        assertEquals(Application.Status.HIRED, f.applications.open(f.student, application.id()).application().status());
+    }
+
+    @Test void simultaneousHiresFillOnlyOneVacancyAndLeaveTheOtherApplicationShortlisted() throws Exception {
+        long job = f.publish();
+        f.confirm(f.student, List.of(f.skill));
+        f.confirm(f.secondStudent, List.of(f.skill));
+        var first = f.applications.apply(f.student, job);
+        var second = f.applications.apply(f.secondStudent, job);
+        for (var application : List.of(first, second)) {
+            f.applications.transition(f.company, application.id(), Application.Status.SHORTLISTED);
+        }
+
+        var start = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            Function<UUID, Boolean> hire = id -> {
+                await(start);
+                try { f.applications.transition(f.company, id, Application.Status.HIRED); return true; }
+                catch (UserError error) { assertTrue(error.getMessage().contains("filled")); return false; }
+            };
+            var firstHire = pool.submit(() -> hire.apply(first.id()));
+            var secondHire = pool.submit(() -> hire.apply(second.id()));
+            start.countDown();
+            assertNotEquals(firstHire.get(15, TimeUnit.SECONDS), secondHire.get(15, TimeUnit.SECONDS));
+        }
+        assertEquals(1, f.applications.list(f.company, job, Application.Status.HIRED).size());
+        assertEquals(1, f.applications.list(f.company, job, Application.Status.SHORTLISTED).size());
     }
 
     @Test void submissionCommittingFirstFreezesAConcurrentEditOnAnotherConnection() throws Exception {

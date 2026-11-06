@@ -1,3 +1,7 @@
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version INT PRIMARY KEY
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     email VARCHAR(254) NOT NULL,
@@ -44,6 +48,8 @@ CREATE TABLE IF NOT EXISTS skill_aliases (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS jobs (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    vacancy_count INT NOT NULL DEFAULT 1,
+    CONSTRAINT job_positive_vacancy_count CHECK (vacancy_count > 0),
     company_id BIGINT NOT NULL,
     title VARCHAR(160) NOT NULL,
     description TEXT NOT NULL,
@@ -57,6 +63,17 @@ CREATE TABLE IF NOT EXISTS jobs (
     FOREIGN KEY(category_id) REFERENCES categories(id),
     INDEX job_visibility(status, category_id, company_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS saved_jobs (
+    student_id BIGINT NOT NULL,
+    job_id BIGINT NOT NULL,
+    saved_title VARCHAR(160) NOT NULL,
+    saved_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY(student_id, job_id),
+    INDEX saved_job_posting(job_id),
+    FOREIGN KEY(student_id) REFERENCES students(user_id) ON DELETE CASCADE,
+    FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS job_requirements (
     job_id BIGINT NOT NULL,
     ordinal INT NOT NULL,
@@ -140,6 +157,7 @@ CREATE TABLE IF NOT EXISTS applications (
     job_id BIGINT NOT NULL,
     cv_version_id CHAR(36) NOT NULL,
     submitted_at TIMESTAMP(6) NOT NULL,
+    hired_at TIMESTAMP(6) NULL,
     status ENUM('APPLIED','SHORTLISTED','HIRED','REJECTED','WITHDRAWN') NOT NULL,
     student_name VARCHAR(120) NOT NULL,
     student_email VARCHAR(254) NOT NULL,
@@ -153,6 +171,41 @@ CREATE TABLE IF NOT EXISTS applications (
     FOREIGN KEY(student_id, cv_version_id) REFERENCES cv_versions(student_id, id),
     FOREIGN KEY(job_id) REFERENCES jobs(id),
     INDEX application_job_status(job_id, status, submitted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS interview_events (
+    application_id CHAR(36) NOT NULL,
+    revision INT NOT NULL,
+    status ENUM('PROPOSED','CONFIRMED','DECLINED','RESCHEDULE_REQUESTED','CANCELLED') NOT NULL,
+    starts_utc DATETIME(6) NOT NULL,
+    ends_utc DATETIME(6) NOT NULL,
+    display_zone VARCHAR(80) NOT NULL,
+    location VARCHAR(500) NOT NULL,
+    changed_utc DATETIME(6) NOT NULL,
+    actor VARCHAR(12) NOT NULL,
+    reason VARCHAR(100) NOT NULL,
+    PRIMARY KEY(application_id, revision),
+    FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS application_notes (
+    application_id CHAR(36) PRIMARY KEY,
+    revision INT NOT NULL,
+    notes VARCHAR(4000) NOT NULL,
+    updated_utc DATETIME(6) NOT NULL,
+    FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS interview_feedback (
+    application_id CHAR(36) PRIMARY KEY,
+    interview_revision INT NOT NULL,
+    rubric_version INT NOT NULL,
+    technical TINYINT NULL,
+    communication TINYINT NULL,
+    role_fit TINYINT NULL,
+    comments VARCHAR(4000) NOT NULL,
+    FOREIGN KEY(application_id) REFERENCES application_notes(application_id) ON DELETE CASCADE,
+    FOREIGN KEY(application_id, interview_revision) REFERENCES interview_events(application_id, revision) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS scoring_policies (
@@ -193,6 +246,28 @@ CREATE TABLE IF NOT EXISTS notifications (
     read_at TIMESTAMP(6) NULL,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX notification_inbox(user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS interview_notices (
+    notice_id CHAR(36) PRIMARY KEY,
+    application_id CHAR(36) NOT NULL,
+    FOREIGN KEY(notice_id) REFERENCES notifications(id) ON DELETE CASCADE,
+    FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS admin_activity (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    event_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    admin_id BIGINT NOT NULL,
+    action VARCHAR(32) NOT NULL,
+    target_kind VARCHAR(16) NOT NULL,
+    target_id VARCHAR(36) NOT NULL,
+    outcome VARCHAR(32) NOT NULL,
+    record_count BIGINT NULL,
+    operation_id CHAR(36) NULL,
+    INDEX admin_activity_action_time(action,event_at),
+    INDEX admin_activity_target(target_id,id),
+    INDEX admin_activity_operation(operation_id,id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS cv_approvals (

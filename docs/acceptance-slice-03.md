@@ -13,9 +13,9 @@ From PowerShell 7 at the project root:
 ```
 
 1. Sign in as `student@smarthire.example` with the existing fictional demo password `SmartHireDemo!21`. Open **My CV**. Before the first confirmation, the screen explains that there is no reviewed CV.
-2. Choose **Upload / replace CV** and select `src/test/resources/documents/fictional-cv.docx`. The supported input is English text-based PDF/DOCX up to 5 MB. OCR and encrypted documents are unsupported.
+2. Choose **Upload CV** or **Replace CV** and select `src/test/resources/documents/fictional-cv.docx`. The supported input is English text-based PDF or DOCX up to 5 MB. OCR and encrypted documents are unsupported.
 3. Inspect **Extracted text** and **Skill catalog**. The fictional DOCX includes project evidence from a table. Suggestions are proposals, not verified claims. Unknown information must be entered manually; the original extracted text stays separate.
-4. On **Review qualifications**, confirm technical and soft skills separately. Ctrl+click toggles a skill; keyboard users can use Ctrl+Space and Shift+arrows. Correct the degree/field, project evidence and its skills, dated work entries and their skill tags, and certifications. Project/work skills accept comma-separated catalog names or stable IDs. Certifications use one line each.
+4. On **Skills and education**, confirm technical and soft skills separately and correct the degree and field. Ctrl+click toggles a skill. Keyboard users can use Ctrl+Space and Shift+arrows. Use **Projects**, **Work experience**, and **Certifications** to review the remaining evidence. Project and work skills accept comma-separated catalog names or stable IDs. Certifications use one line each.
 5. Add work evidence with start `2025-01`, end `2025-06`, and Java as a skill tag. For an ongoing role, select Ongoing; its end freezes at the month of confirmation. Future or reversed dates must fail with feedback. Blank qualification categories are allowed and do not invent evidence.
 6. Select **Confirm reviewed CV**. Inspect the current indicator and **View selected review**. Restart the app and verify the review, dates, projects, skill tags, and certifications persist.
 7. **Save selected original…** must export the uploaded original bytes. Choose a destination outside `.local/documents`; the managed store is maintained by the app.

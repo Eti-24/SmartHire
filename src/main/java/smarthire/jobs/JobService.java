@@ -13,6 +13,7 @@ import smarthire.identity.Role;
 import smarthire.identity.UserError;
 import smarthire.skills.Skill;
 import smarthire.skills.SkillVocabulary;
+import smarthire.workspace.AdminActivity;
 import static smarthire.jobs.Job.*;
 
 public final class JobService {
@@ -43,9 +44,12 @@ public final class JobService {
     }
 
     public void verify(UUID session, long companyId, boolean verified) {
+        Profile admin = identity.requireRole(session, Role.ADMIN);
         access(session, Role.ADMIN, store -> {
-            company(store, companyId);
+            if (company(store, companyId).verified() == verified) { return null; }
             store.verify(companyId, verified);
+            store.audit(admin.id(), new AdminActivity.Change(AdminActivity.Action.COMPANY_VERIFICATION, "COMPANY",
+                    Long.toString(companyId), verified ? "VERIFIED" : "UNVERIFIED"));
             return null;
         });
     }
@@ -99,6 +103,7 @@ public final class JobService {
     }
 
     public void moderate(UUID session, long id, boolean approve, String reason) {
+        Profile admin = identity.requireRole(session, Role.ADMIN);
         String decision = approve ? "Approved" : text(reason, "Rejection reason", 1000);
         access(session, Role.ADMIN, store -> {
             Job job = get(store, id);
@@ -111,6 +116,8 @@ public final class JobService {
                         new SkillVocabulary(store.skills()), store.activePolicy());
             }
             store.status(id, approve ? Status.APPROVED : Status.REJECTED, decision);
+            store.audit(admin.id(), new AdminActivity.Change(AdminActivity.Action.JOB_MODERATION, "JOB",
+                    Long.toString(id), approve ? "APPROVED" : "REJECTED"));
             return null;
         });
     }
@@ -127,16 +134,50 @@ public final class JobService {
     public List<Job> list(UUID session, String title, Long categoryId) {
         Profile actor = identity.profile(session);
         String query = title == null ? "" : title.strip().toLowerCase(Locale.ROOT);
-        return access(session, actor.role(), store -> store.jobs().stream()
+        return access(session, actor.role(), store -> (actor.role() == Role.STUDENT ? store.unfilledJobs() : store.jobs()).stream()
                 .filter(job -> switch (actor.role()) {
                     case ADMIN -> true;
                     case COMPANY -> job.companyId() == actor.id();
-                    case STUDENT -> visible(store, job);
+                    case STUDENT -> published(store, job);
                 })
                 .filter(job -> job.details().title().toLowerCase(Locale.ROOT).contains(query))
                 .filter(job -> categoryId == null || job.details().categoryId() == categoryId)
                 .toList());
     }
+
+    public List<HiringRecord> hiringHistory(UUID session) {
+        Profile actor = identity.profile(session);
+        if (actor.role() == Role.ADMIN) { throw new UserError("Hiring history is available to students and companies."); }
+        return access(session, actor.role(), store -> store.hiringHistory(actor.role() == Role.COMPANY ? actor.id() : null));
+    }
+
+    public List<CompanyHire> companyHires(UUID session) {
+        Profile actor = identity.requireRole(session, Role.COMPANY);
+        return access(session, Role.COMPANY, store -> store.companyHires(actor.id()));
+    }
+
+    public List<SavedJob> savedJobs(UUID session) {
+        Profile actor = identity.requireRole(session, Role.STUDENT);
+        return access(session, Role.STUDENT, store -> store.savedJobs(actor.id()));
+    }
+
+    public void saveBookmark(UUID session, long jobId) {
+        Profile actor = identity.requireRole(session, Role.STUDENT);
+        access(session, Role.STUDENT, store -> {
+            Job job = get(store, jobId);
+            if (!visible(store, job)) { throw new UserError("This posting is no longer available to save."); }
+            store.saveBookmark(actor.id(), job);
+            return null;
+        });
+    }
+
+    public void removeBookmark(UUID session, long jobId) {
+        Profile actor = identity.requireRole(session, Role.STUDENT);
+        access(session, Role.STUDENT, store -> { store.removeBookmark(actor.id(), jobId); return null; });
+    }
+
+    public enum SavedStatus { AVAILABLE, CLOSED, FILLED, UNAVAILABLE }
+    public record SavedJob(long jobId, String title, SavedStatus status, java.util.UUID applicationId) { }
 
     public Job open(UUID session, long id) {
         Profile actor = identity.profile(session);
@@ -222,6 +263,10 @@ public final class JobService {
     }
 
     private static boolean visible(JobRepository.Store store, Job job) {
+        return published(store, job) && job.remainingVacancies() > 0;
+    }
+
+    private static boolean published(JobRepository.Store store, Job job) {
         Company company = company(store, job.companyId());
         return job.status() == Status.APPROVED && company.active() && company.verified();
     }
@@ -243,6 +288,7 @@ public final class JobService {
 
     private static Details validate(JobRepository.Store store, Details details) {
         if (details == null) { throw new UserError("Job details are required."); }
+        if (details.vacancyCount() < 1) { throw new UserError("Enter at least one vacancy."); }
         String title = text(details.title(), "Title", 160);
         String description = text(details.description(), "Description", 10000);
         String location = text(details.location(), "Location", 180);
@@ -288,7 +334,7 @@ public final class JobService {
         if (!scored) { throw new UserError("Add at least one scored requirement."); }
         if (experience != tag) { throw new UserError("Positive experience requires at least one relevance skill tag, and tags require positive experience."); }
         if (field && !degree) { throw new UserError("A degree field requires a minimum degree."); }
-        return new Details(title, description, details.categoryId(), location, min, max, requirements);
+        return new Details(title, description, details.categoryId(), location, min, max, requirements, details.vacancyCount());
     }
 
     private static String canonical(String value) {

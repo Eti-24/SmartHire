@@ -2,8 +2,6 @@ package smarthire.ui;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.YearMonth;
@@ -16,6 +14,7 @@ import java.util.function.Consumer;
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
+import smarthire.cv.CvApproval;
 import smarthire.cv.CvProfile;
 import smarthire.cv.CvService;
 import smarthire.identity.UserError;
@@ -29,11 +28,11 @@ public final class CvPanel extends JPanel {
     private final UUID session;
     private final Runnable onBack;
     private final JPanel body = new JPanel(new BorderLayout(12, 12));
-    private final JTextArea message = new JTextArea(3, 45);
+    private final JTextArea message = WorkspaceStyle.message("Loading CV versions…");
     private CvService.Draft draft;
     private List<Skill> catalog = List.of();
     private boolean busy;
-    private volatile boolean departed;
+    private boolean departed;
 
     public CvPanel(CvService service, UUID session, Runnable onBack) {
         super(new BorderLayout(12, 12));
@@ -44,45 +43,103 @@ public final class CvPanel extends JPanel {
                 work(() -> { draft.close(); return true; }, ignored -> { draft = null; leave(); });
             } else { leave(); }
         });
-        add(back, BorderLayout.NORTH); add(body, BorderLayout.CENTER);
-        message.setEditable(false); message.setLineWrap(true); message.setWrapStyleWord(true);
+        if (onBack != null) { add(back, BorderLayout.NORTH); }
+        add(body, BorderLayout.CENTER);
         add(message, BorderLayout.SOUTH);
         load();
     }
 
     private void leave() { departed = true; onBack.run(); }
 
+    @Override public void removeNotify() {
+        departed = true;
+        if (!busy) { discardDraft(null); }
+        super.removeNotify();
+    }
+
+    private void discardDraft(Object result) {
+        CvService.Draft abandoned = result instanceof CvService.Draft returned ? returned : draft;
+        draft = null;
+        if (abandoned != null) {
+            new SwingWorker<Void, Void>() {
+                @Override protected Void doInBackground() { abandoned.close(); return null; }
+            }.execute();
+        }
+    }
+
     private void load() {
-        work(() -> new Overview(service.current(session).orElse(null), service.history(session), service.skills(session), service.approvals(session)), overview -> {
+        work(() -> new Overview(service.current(session).orElse(null), service.history(session), service.skills(session),
+                service.approvals(session)), overview -> {
             catalog = overview.skills();
-            body.removeAll();
-            CvProfile current = overview.current();
-            JTextArea description = text(current == null
-                    ? "No reviewed CV yet. Upload a CV, correct the suggestions, and confirm your qualifications."
-                    : "Current CV: " + current.originalName() + "\nReviewed: " + current.reviewedAt()
-                            + "\n" + current.qualifications().skills().size() + " skills · " + current.qualifications().projects().size()
-                            + " projects · " + current.qualifications().experience().size() + " work entries\n"
-                            + overview.approvals().getOrDefault(current.id(), smarthire.cv.CvApproval.pending()).message(), 6);
-            body.add(description, BorderLayout.NORTH);
-            DefaultTableModel model = new DefaultTableModel(new Object[]{"Confirmed", "File", "Current", "Admin approval"}, 0) {
+            var current = overview.current();
+            var model = new DefaultTableModel(new Object[]{"CV version", "Current", "CV approval"}, 0) {
                 @Override public boolean isCellEditable(int row, int column) { return false; }
             };
-            for (Version version : overview.history()) {
-                model.addRow(new Object[]{version.reviewedAt(), version.originalName(), current != null && current.id().equals(version.id()) ? "Yes" : "",
-                        overview.approvals().getOrDefault(version.id(), smarthire.cv.CvApproval.pending()).status()});
+            for (var version : overview.history()) {
+                model.addRow(new Object[]{version.originalName(), isCurrent(current, version) ? "Current" : "",
+                        approvalLabel(overview.approvals().getOrDefault(version.id(), CvApproval.pending()))});
             }
-            JTable history = new JTable(model); history.setAutoCreateRowSorter(true); history.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-            body.add(new JScrollPane(history), BorderLayout.CENTER);
-            JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            button(actions, "Upload / replace CV", this::upload);
-            if (current != null) { button(actions, "Edit current review", () -> work(() -> service.edit(session), this::review)); }
-            button(actions, "View selected review", () -> selected(history, overview.history(), version -> work(() -> service.review(session, version.id()), this::view)));
-            button(actions, "Save selected original…", () -> selected(history, overview.history(), this::download));
-            button(actions, "Refresh approval status", this::load);
+            var history = new JTable(model);
+            history.setAutoCreateRowSorter(true);
+            history.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            history.getAccessibleContext().setAccessibleName("Confirmed CV versions");
+            history.getColumnModel().getColumn(0).setPreferredWidth(220);
+            history.getColumnModel().getColumn(1).setPreferredWidth(70);
+            WorkspaceStyle.statusColumn(history, 2);
+            var preview = new WorkspaceStyle.Preview();
+            preview.showRecord("No confirmed CV", "Upload a CV, review the suggested qualifications and confirm the version.");
+            var toolbar = WorkspaceStyle.actions();
+            var upload = WorkspaceStyle.button(current == null ? "Upload CV" : "Replace CV", this::upload);
+            WorkspaceStyle.primary(upload);
+            toolbar.add(upload);
+            if (current != null) {
+                button(toolbar, "Edit current review", () -> work(() -> service.edit(session), this::review));
+            }
+            button(toolbar, "Refresh approval status", this::load);
+
+            var open = WorkspaceStyle.button("View selected review", () -> {
+                var version = WorkspaceStyle.selected(history, overview.history());
+                work(() -> service.review(session, version.id()), this::view);
+            });
+            var original = WorkspaceStyle.button("Save selected original…", () -> download(WorkspaceStyle.selected(history, overview.history())));
+            open.setEnabled(false);
+            original.setEnabled(false);
+            WorkspaceStyle.previewSelection(history, overview.history(), version -> {
+                open.setEnabled(version != null);
+                original.setEnabled(version != null);
+                if (version == null) {
+                    preview.showRecord("CV versions", "Select a version to inspect its approval status.");
+                    return;
+                }
+                boolean active = isCurrent(current, version);
+                var approval = overview.approvals().getOrDefault(version.id(), CvApproval.pending());
+                String review = version.originalName() + "\nConfirmed " + WorkspaceStyle.date(version.reviewedAt());
+                if (active) {
+                    var qualifications = current.qualifications();
+                    review += "\n\nCurrent version\n" + qualifications.skills().size() + " skills · "
+                            + qualifications.projects().size() + " projects · " + qualifications.experience().size() + " work entries";
+                }
+                preview.showRecord(approvalLabel(approval), review + "\n\n" + (active ? approval.message()
+                        : "This historical version retains its approval decision." + (approval.reason().isBlank() ? "" : "\n" + approval.reason())));
+            });
+            var actions = WorkspaceStyle.actions();
+            actions.add(open);
+            actions.add(original);
+            body.removeAll();
+            body.add(toolbar, BorderLayout.NORTH);
+            body.add(WorkspaceStyle.split(WorkspaceStyle.table(history), preview), BorderLayout.CENTER);
             body.add(actions, BorderLayout.SOUTH);
-            message.setText("English text-based PDF or DOCX, up to 5 MB. Confirming submits this version for admin approval. Previous versions are retained.");
+            message.setText("English text-based PDF or DOCX, up to 5 MB. Confirming sends the version for admin approval.");
             refresh();
         });
+    }
+
+    private static boolean isCurrent(CvProfile current, Version version) {
+        return current != null && current.id().equals(version.id());
+    }
+
+    private static String approvalLabel(CvApproval approval) {
+        return approval.status() == CvApproval.Status.PENDING ? "Pending approval" : WorkspaceStyle.label(approval.status());
     }
 
     private void upload() {
@@ -97,33 +154,35 @@ public final class CvPanel extends JPanel {
     private void review(CvService.Draft pending) {
         draft = pending;
         Qualifications q = pending.suggestions();
-        JPanel form = form();
-        form.add(text("Review " + pending.originalName() + "\nSuggestions can be incomplete or incorrect. Confirm only qualifications you can support. Blank categories are allowed.", 3));
+        var qualifications = WorkspaceStyle.form();
+        var projectsForm = new JPanel(new BorderLayout(0, 8));
+        var experienceForm = new JPanel(new BorderLayout(0, 8));
+        var certificatesForm = WorkspaceStyle.form();
         JList<Skill> technical = skillSelection(q.skills(), Skill.Type.TECHNICAL);
         JList<Skill> soft = skillSelection(q.skills(), Skill.Type.SOFT);
-        field(form, "Technical skills (Ctrl+click to select or clear; Shift+arrows on keyboard)", new JScrollPane(technical));
-        field(form, "Soft skills (select only those you confirm)", new JScrollPane(soft));
+        field(qualifications, "Technical skills (Ctrl+click or Shift+arrow to select multiple)", new JScrollPane(technical));
+        field(qualifications, "Soft skills", new JScrollPane(soft));
         JComboBox<String> degree = new JComboBox<>(); degree.addItem("Not provided");
         for (Degree value : Degree.values()) { degree.addItem(value.name()); }
         degree.setSelectedItem(q.degree() == null ? "Not provided" : q.degree().name());
-        field(form, "Highest degree (demo order: secondary, diploma, bachelor, master, doctorate)", degree);
-        JTextField subject = new JTextField(q.field()); field(form, "Degree field (optional)", subject);
+        field(qualifications, "Highest degree", degree);
+        JTextField subject = new JTextField(q.field()); field(qualifications, "Degree field (optional)", subject);
 
         DefaultTableModel projects = new DefaultTableModel(new Object[]{"Project evidence", "Skills (comma separated)"}, 0);
         for (Project p : q.projects()) { projects.addRow(new Object[]{p.evidence(), labels(p.skills())}); }
-        JTable projectTable = table(form, "Projects: only skills supported by each project count as project evidence.", projects,
+        JTable projectTable = table(projectsForm, "Include the skills supported by each project.", projects,
                 new Object[]{"", ""});
 
         DefaultTableModel experience = new DefaultTableModel(new Object[]{"Work evidence", "Start YYYY-MM", "End YYYY-MM", "Ongoing", "Skill tags (comma separated)"}, 0) {
             @Override public Class<?> getColumnClass(int column) { return column == 3 ? Boolean.class : String.class; }
         };
         for (Experience e : q.experience()) { experience.addRow(new Object[]{e.evidence(), e.start().toString(), e.end().toString(), e.ongoing(), labels(e.skills())}); }
-        JTable workTable = table(form, "Experience: use YYYY-MM dates. Ongoing end freezes at the month you confirm this review.", experience,
+        JTable workTable = table(experienceForm, "Use YYYY-MM dates. Ongoing work ends at the month you confirm this review.", experience,
                 new Object[]{"", "", "", false, ""});
         JTextArea certificates = new JTextArea(String.join("\n", q.certifications()), 4, 40);
-        field(form, "Certifications (one per line)", new JScrollPane(certificates));
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        button(actions, "Confirm and submit for approval", () -> {
+        field(certificatesForm, "Certifications (one per line)", new JScrollPane(certificates));
+        var actions = WorkspaceStyle.actions();
+        var confirm = WorkspaceStyle.button("Confirm and submit for approval", () -> {
             try {
                 if (!stop(projectTable) || !stop(workTable)) { message.setText("Finish editing the selected table cell."); return; }
                 var projectItems = new ArrayList<Project>();
@@ -142,14 +201,24 @@ public final class CvPanel extends JPanel {
                 work(() -> service.confirm(session, pending, input), saved -> { draft = null; load(); });
             } catch (java.time.DateTimeException exception) { message.setText("Use valid YYYY-MM work dates, such as 2025-01."); }
         });
+        WorkspaceStyle.primary(confirm);
+        actions.add(confirm);
         button(actions, "Cancel review", () -> work(() -> { pending.close(); return true; }, ignored -> { draft = null; load(); }));
-        form.add(actions);
-        JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("Review qualifications", new JScrollPane(form));
-        tabs.addTab("Extracted text", new JScrollPane(text(pending.extractedText(), 16)));
-        tabs.addTab("Skill catalog", new JScrollPane(text(catalog.stream().map(s -> s.name() + " [" + s.id() + "] · " + s.type()).collect(java.util.stream.Collectors.joining("\n")), 16)));
-        body.removeAll(); body.add(tabs); refresh();
-        message.setText("Confirming creates a new version awaiting admin approval, including qualification-only edits. Your previous CV stays current until confirmation. Cancel discards this draft.");
+        var tabs = new JTabbedPane();
+        tabs.addTab("Skills and education", WorkspaceStyle.scroll(qualifications));
+        tabs.addTab("Projects", projectsForm);
+        tabs.addTab("Work experience", experienceForm);
+        tabs.addTab("Certifications", WorkspaceStyle.scroll(certificatesForm));
+        tabs.addTab("Extracted text", WorkspaceStyle.text(pending.extractedText()));
+        tabs.addTab("Skill catalog", WorkspaceStyle.text(catalog.stream().map(s -> s.name() + " [" + s.id() + "] · " + s.type())
+                .collect(java.util.stream.Collectors.joining("\n"))));
+        body.removeAll();
+        body.add(WorkspaceStyle.message("Review " + pending.originalName()
+                + "\nCheck the suggestions and confirm only qualifications you can support. Blank categories are allowed."), BorderLayout.NORTH);
+        body.add(tabs, BorderLayout.CENTER);
+        body.add(actions, BorderLayout.SOUTH);
+        refresh();
+        message.setText("Confirming sends a new version for admin approval. Leaving My CV or cancelling discards this draft.");
     }
 
     private void view(CvProfile profile) {
@@ -165,9 +234,9 @@ public final class CvPanel extends JPanel {
         for (Experience e : q.experience()) { summary.append(e.evidence()).append("\n").append(e.start()).append(" to ").append(e.end())
                 .append(e.ongoing() ? " (ongoing, end frozen at review)" : "").append("\nTags: ").append(labels(e.skills())).append("\n\n"); }
         summary.append("Certifications\n").append(String.join("\n", q.certifications()));
-        JTabbedPane tabs = new JTabbedPane(); tabs.addTab("Confirmed review", new JScrollPane(text(summary.toString(), 16)));
-        tabs.addTab("Extracted text", new JScrollPane(text(profile.extractedText(), 16)));
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT)); button(actions, "Back to CV versions", this::load);
+        JTabbedPane tabs = new JTabbedPane(); tabs.addTab("Confirmed review", WorkspaceStyle.text(summary.toString()));
+        tabs.addTab("Extracted text", WorkspaceStyle.text(profile.extractedText()));
+        JPanel actions = WorkspaceStyle.actions(); button(actions, "Back to CV versions", this::load);
         button(actions, "Save original…", () -> download(new Version(profile.id(), profile.originalName(), profile.reviewedAt())));
         body.removeAll(); body.add(tabs); body.add(actions, BorderLayout.SOUTH); refresh();
         message.setText("This saved review is immutable. Edit the current review to create a new version.");
@@ -193,7 +262,7 @@ public final class CvPanel extends JPanel {
         list.setCellRenderer(new DefaultListCellRenderer() {
             @Override public Component getListCellRendererComponent(JList<?> source, Object value, int index, boolean chosen, boolean focus) {
                 Skill skill = (Skill) value;
-                return super.getListCellRendererComponent(source, skill.name() + " [" + skill.id() + "]", index, chosen, focus);
+                return super.getListCellRendererComponent(source, skill.name(), index, chosen, focus);
             }
         });
         for (int i = 0; i < values.length; i++) { if (selected.contains(values[i].id())) { list.addSelectionInterval(i, i); } }
@@ -202,53 +271,57 @@ public final class CvPanel extends JPanel {
     private static List<String> split(String value) { return value.isBlank() ? List.of() : Arrays.stream(value.split(",", -1)).map(String::strip).toList(); }
     private static String value(DefaultTableModel model, int row, int column) { Object value = model.getValueAt(row, column); return value == null ? "" : value.toString().strip(); }
     private static boolean stop(JTable table) { return !table.isEditing() || table.getCellEditor().stopCellEditing(); }
-    private static JPanel form() { JPanel panel = new JPanel(); panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS)); return panel; }
-    private static JTextArea text(String value, int rows) { JTextArea area = new JTextArea(value, rows, 45); area.setEditable(false); area.setLineWrap(true); area.setWrapStyleWord(true); area.setCaretPosition(0); return area; }
-    private static void field(JPanel form, String label, JComponent component) {
-        JLabel caption = new JLabel(label); caption.setLabelFor(component); form.add(caption);
-        component.setMaximumSize(new Dimension(Integer.MAX_VALUE, component instanceof JScrollPane ? 110 : 32)); form.add(component); form.add(Box.createVerticalStrut(10));
-    }
-    private static JTable table(JPanel form, String label, DefaultTableModel model, Object[] blank) {
-        form.add(new JLabel(label)); JTable table = new JTable(model); table.setRowHeight(28); table.setSurrendersFocusOnKeystroke(true);
-        JScrollPane scroll = new JScrollPane(table); scroll.setPreferredSize(new Dimension(650, 150)); form.add(scroll);
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    private static void field(JPanel form, String label, JComponent component) { WorkspaceStyle.field(form, label, component); }
+
+    private static JTable table(JPanel form, String guidance, DefaultTableModel model, Object[] blank) {
+        WorkspaceStyle.surface(form, 12);
+        form.add(WorkspaceStyle.message(guidance), BorderLayout.NORTH);
+        var table = new JTable(model);
+        table.setSurrendersFocusOnKeystroke(true);
+        form.add(WorkspaceStyle.table(table), BorderLayout.CENTER);
+        var actions = WorkspaceStyle.actions();
         button(actions, "Add row", () -> { if (stop(table)) { model.addRow(blank); } });
-        button(actions, "Remove selected row", () -> { if (stop(table) && table.getSelectedRow() >= 0) { model.removeRow(table.getSelectedRow()); } }); form.add(actions);
+        button(actions, "Remove selected row", () -> {
+            if (stop(table) && table.getSelectedRow() >= 0) { model.removeRow(table.getSelectedRow()); }
+        });
+        form.add(actions, BorderLayout.SOUTH);
         return table;
     }
-    private static void button(JPanel panel, String label, Runnable task) { JButton button = new JButton(label); button.addActionListener(event -> task.run()); panel.add(button); }
-    private void selected(JTable table, List<Version> versions, Consumer<Version> action) {
-        if (table.getSelectedRow() < 0) { message.setText("Select a CV version first."); }
-        else { action.accept(versions.get(table.convertRowIndexToModel(table.getSelectedRow()))); }
-    }
+
+    private static void button(JPanel panel, String label, Runnable task) { panel.add(WorkspaceStyle.button(label, task)); }
+
     private void refresh() { revalidate(); repaint(); }
 
     private <T> void work(Callable<T> task, Consumer<T> success) {
         if (busy) { return; }
-        busy = true; enable(body, false); message.setText("Working… You can return to the overview while a file is being read.");
+        busy = true;
+        Runnable restore = WorkspaceStyle.disable(body);
+        message.setText("Working…");
         new SwingWorker<T, Void>() {
             @Override protected T doInBackground() throws Exception { return task.call(); }
             @Override protected void done() {
-                busy = false; enable(body, true);
+                busy = false;
+                if (!departed) { restore.run(); }
+                T result = null;
                 try {
-                    T result = get();
-                    if (departed) {
-                        if (result instanceof CvService.Draft abandoned) {
-                            new SwingWorker<Void, Void>() { @Override protected Void doInBackground() { abandoned.close(); return null; } }.execute();
-                        }
-                        return;
+                    result = get();
+                    if (!departed) {
+                        message.setText("");
+                        success.accept(result);
                     }
-                    message.setText("Ready"); success.accept(result);
-                } catch (InterruptedException exception) { Thread.currentThread().interrupt(); message.setText("Interrupted. Try again."); }
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    if (!departed) { message.setText("Interrupted. Try again."); }
+                }
                 catch (java.util.concurrent.ExecutionException exception) {
-                    message.setText(exception.getCause() instanceof UserError ? exception.getCause().getMessage() : "The operation failed. Check file access and the database, then try again.");
+                    if (!departed) {
+                        message.setText(exception.getCause() instanceof UserError ? exception.getCause().getMessage() : "The operation failed. Check file access and the database, then try again.");
+                    }
+                } finally {
+                    if (departed) { discardDraft(result); }
                 }
             }
         }.execute();
-    }
-    private static void enable(Component component, boolean enabled) {
-        component.setEnabled(enabled);
-        if (component instanceof java.awt.Container container) { for (Component child : container.getComponents()) { enable(child, enabled); } }
     }
     private record Overview(CvProfile current, List<Version> history, List<Skill> skills, java.util.Map<UUID, smarthire.cv.CvApproval> approvals) { }
 }

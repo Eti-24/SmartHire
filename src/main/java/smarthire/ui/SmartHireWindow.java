@@ -5,18 +5,27 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
-import java.awt.GridLayout;
-import java.awt.Toolkit;
+import java.awt.GridBagLayout;
+import java.awt.GraphicsEnvironment;
+import java.awt.Image;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
+import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -24,6 +33,7 @@ import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.SwingConstants;
 import javax.swing.SwingWorker;
 import javax.swing.WindowConstants;
 import smarthire.identity.IdentityService;
@@ -32,8 +42,21 @@ import smarthire.identity.Role;
 import smarthire.identity.UserError;
 
 public final class SmartHireWindow extends JFrame {
-    private final JPanel content = new JPanel(new BorderLayout(24, 24));
-    private final JTextArea status = new JTextArea("Starting SmartHire…", 3, 30);
+    static { WorkspaceStyle.install(); }
+
+    private static final BufferedImage LOGO = loadLogo();
+    // Isolate the emblem from the wordmark so it remains recognizable at icon sizes.
+    private static final BufferedImage EMBLEM = LOGO.getSubimage(402, 94, 602, 602);
+    private static final ImageIcon SIGN_IN_LOGO = new ImageIcon(LOGO.getScaledInstance(224, -1, Image.SCALE_SMOOTH),
+            "SmartHire — Intelligent CV Analysis & Job Recommendation");
+    private static final ImageIcon SIDEBAR_ICON = new ImageIcon(EMBLEM.getScaledInstance(32, 32, Image.SCALE_SMOOTH));
+
+    private final JPanel content = new JPanel(new BorderLayout(0, 12));
+    private final JTextArea status = WorkspaceStyle.message("Starting SmartHire…");
+    private final JPanel sidebar = new JPanel(new BorderLayout(0, 12));
+    private final Map<String, JButton> navigation = new LinkedHashMap<>();
+    private JPanel navigationLinks;
+    private JLabel account;
     private IdentityService identity;
     private smarthire.jobs.JobService jobs;
     private smarthire.cv.CvService cvs;
@@ -46,20 +69,27 @@ public final class SmartHireWindow extends JFrame {
 
     public SmartHireWindow() {
         super("SmartHire • Local hiring demo");
+        setIconImages(List.of(EMBLEM.getScaledInstance(16, 16, Image.SCALE_SMOOTH), SIDEBAR_ICON.getImage(),
+                EMBLEM.getScaledInstance(48, 48, Image.SCALE_SMOOTH)));
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        content.setBorder(BorderFactory.createEmptyBorder(24, 28, 24, 28));
+        content.setBorder(BorderFactory.createEmptyBorder(16, 18, 12, 18));
         add(content, BorderLayout.CENTER);
-        status.setEditable(false);
-        status.setFocusable(false);
-        status.setLineWrap(true);
-        status.setWrapStyleWord(true);
-        status.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        status.setBorder(BorderFactory.createEmptyBorder(10, 28, 16, 28));
-        add(status, BorderLayout.SOUTH);
-        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
-        setSize(Math.min(1040, screen.width - 80), Math.min(760, screen.height - 80));
-        setMinimumSize(new Dimension(Math.min(620, getWidth()), Math.min(460, getHeight())));
+        status.setBorder(BorderFactory.createEmptyBorder(6, 0, 0, 0));
+        sidebar.setBackground(WorkspaceStyle.NAVY);
+        sidebar.setVisible(false);
+        add(sidebar, BorderLayout.WEST);
+        var screen = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
+        setSize(Math.min(1210, screen.width), Math.min(700, screen.height));
+        setMinimumSize(new Dimension(Math.min(920, getWidth()), Math.min(460, getHeight())));
         setLocationRelativeTo(null);
+    }
+
+    private static BufferedImage loadLogo() {
+        try {
+            return ImageIO.read(SmartHireWindow.class.getResource("/ui/smarthire-logo.png"));
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Could not load the bundled SmartHire logo.", exception);
+        }
     }
 
     public void connect(Callable<IdentityService> connection) {
@@ -104,21 +134,27 @@ public final class SmartHireWindow extends JFrame {
         }, () -> {
             JButton retry = new JButton("Retry connection");
             retry.addActionListener(event -> connect(connection, jobFactory, cvFactory, applicationFactory, workspaceFactory, approvalFactory));
-            showBody("Database unavailable", retry);
+            var actions = WorkspaceStyle.actions();
+            WorkspaceStyle.primary(retry);
+            actions.add(retry);
+            showBody("Database unavailable", actions, false);
         });
     }
 
     private void login() {
-        JPanel form = form();
-        JTextField email = new JTextField();
-        JPasswordField password = new JPasswordField();
+        sidebar.setVisible(false);
+        sidebar.removeAll();
+        navigation.clear();
+        JPanel form = WorkspaceStyle.form();
+        JTextField email = new JTextField(30);
+        JPasswordField password = new JPasswordField(30);
+        form.add(new JLabel(SIGN_IN_LOGO));
+        form.add(Box.createVerticalStrut(12));
         field(form, "Email", email);
         field(form, "Password", password);
         JButton signIn = new JButton("Sign in");
         JButton register = new JButton("Create an account");
-        form.add(signIn);
-        form.add(Box.createVerticalStrut(12));
-        form.add(register);
+        form.add(formActions(signIn, register));
         signIn.addActionListener(event -> {
             String address = email.getText();
             char[] secret = password.getPassword();
@@ -141,16 +177,16 @@ public final class SmartHireWindow extends JFrame {
             });
         });
         register.addActionListener(event -> register());
-        showBody("SmartHire · Sign in", form);
+        showBody("SmartHire · Sign in", centered(form));
         getRootPane().setDefaultButton(signIn);
         status.setText("A local workspace for students, companies, and administrators.");
     }
 
     private void register() {
-        JPanel form = form();
-        JTextField name = new JTextField();
-        JTextField email = new JTextField();
-        JPasswordField password = new JPasswordField();
+        JPanel form = WorkspaceStyle.form();
+        JTextField name = new JTextField(30);
+        JTextField email = new JTextField(30);
+        JPasswordField password = new JPasswordField(30);
         JComboBox<Role> role = new JComboBox<>(new Role[]{Role.STUDENT, Role.COMPANY});
         field(form, "Account type", role);
         field(form, "Your name / company name", name);
@@ -158,9 +194,7 @@ public final class SmartHireWindow extends JFrame {
         field(form, "Password (10–128 characters)", password);
         JButton create = new JButton("Create account");
         JButton back = new JButton("Back to sign in");
-        form.add(create);
-        form.add(Box.createVerticalStrut(12));
-        form.add(back);
+        form.add(formActions(create, back));
         create.addActionListener(event -> {
             String address = email.getText();
             String displayName = name.getText();
@@ -179,98 +213,154 @@ public final class SmartHireWindow extends JFrame {
             });
         });
         back.addActionListener(event -> login());
-        showBody("Create your SmartHire account", form);
+        showBody("Create your SmartHire account", centered(form));
         getRootPane().setDefaultButton(create);
         status.setText("Students and companies can register. Admin accounts are provisioned separately.");
     }
 
     private void home(Profile profile) {
-        JPanel panel = new JPanel(new BorderLayout(24, 24));
-        JPanel navigation = new JPanel(new GridLayout(0, 1, 0, 12));
-        JButton dashboard = new JButton("Overview");
-        JButton edit = new JButton("My profile");
-        JButton logout = new JButton("Sign out");
-        navigation.add(dashboard);
-        navigation.add(edit);
-        if (cvs != null && profile.role() == Role.STUDENT) {
-            JButton cv = new JButton("My CV");
-            navigation.add(cv);
-            cv.addActionListener(event -> showBody("My CV and qualifications", new CvPanel(cvs, session, () -> run(() -> identity.profile(session), this::home))));
+        if (navigation.isEmpty()) {
+            buildNavigation(profile.role());
         }
-        if (jobs != null) {
-            JButton postings = new JButton(profile.role() == Role.STUDENT ? "Find jobs" : "Jobs and administration");
-            navigation.add(postings);
-            postings.addActionListener(event -> showBody("Job workspace", new JobsPanel(jobs, session, profile.role(), () -> run(() -> identity.profile(session), this::home), 0, applications)));
-        }
-        if (matches != null && profile.role() == Role.STUDENT) {
-            JButton recommendations = new JButton("Job matches");
-            navigation.add(recommendations);
-            recommendations.addActionListener(event -> showMatches());
-        }
-        if (applications != null && profile.role() != Role.ADMIN) {
-            JButton submissions = new JButton(profile.role() == Role.STUDENT ? "My applications" : "Applicants");
-            navigation.add(submissions);
-            submissions.addActionListener(event -> showBody(submissions.getText(), new ApplicationsPanel(applications, session, profile.role(),
-                    () -> run(() -> identity.profile(session), this::home))));
-        }
-        if (workspace != null) {
-            var inbox = new JButton("Notifications"); navigation.add(inbox);
-            inbox.addActionListener(e -> showBody("Notifications", new WorkspacePanel(workspace, session, "notices", () -> run(() -> identity.profile(session), this::home))));
-            if (profile.role() == Role.ADMIN) {
-                var accounts = new JButton("Accounts"); var monitoring = new JButton("Application monitoring");
-                navigation.add(accounts); navigation.add(monitoring);
-                accounts.addActionListener(e -> showBody("Accounts", new WorkspacePanel(workspace, session, "accounts", () -> run(() -> identity.profile(session), this::home))));
-                monitoring.addActionListener(e -> showBody("Application monitoring", new WorkspacePanel(workspace, session, "monitor", () -> run(() -> identity.profile(session), this::home))));
-            }
-        }
-        if (cvApprovals != null && profile.role() == Role.ADMIN) {
-            var reviewCvs = new JButton("CV review"); navigation.add(reviewCvs);
-            reviewCvs.addActionListener(e -> showBody("Student CV review", new CvApprovalPanel(cvApprovals, session, () -> run(() -> identity.profile(session), this::home))));
-        }
-        navigation.add(logout);
-        JPanel sidebar = new JPanel(new BorderLayout());
-        sidebar.add(navigation, BorderLayout.NORTH);
-        panel.add(sidebar, BorderLayout.WEST);
-        JTextArea welcome = new JTextArea(switch (profile.role()) {
-            case STUDENT -> "Welcome, " + profile.name() + "\n\nStudent workspace\n\nKeep your contact details and university information up to date in My profile.";
-            case COMPANY -> "Welcome, " + profile.name() + "\n\nCompany workspace\n\nIntroduce your organization and update its contact details in My profile.";
-            case ADMIN -> "Welcome, " + profile.name() + "\n\nAdministration workspace\n\nYour administrator account is ready. Update your contact details in My profile.";
-        });
-        welcome.setEditable(false);
-        welcome.setLineWrap(true);
-        welcome.setWrapStyleWord(true);
-        welcome.setFont(new Font("Segoe UI", Font.PLAIN, 18));
-        panel.add(welcome, BorderLayout.CENTER);
+        updateAccount(profile);
+        JPanel panel = new JPanel(new BorderLayout(0, 12));
+        var greeting = WorkspaceStyle.message("Welcome, " + profile.name());
+        greeting.setFont(greeting.getFont().deriveFont(Font.BOLD, 16f));
+        panel.add(greeting, BorderLayout.NORTH);
+        var loading = WorkspaceStyle.message(workspace == null ? "Use the sidebar to open your workspace." : "Loading workspace activity…");
+        panel.add(loading, BorderLayout.CENTER);
         if (workspace != null) {
             UUID currentSession = session;
             new SwingWorker<smarthire.workspace.WorkspaceRepository.Dashboard, Void>() {
                 @Override protected smarthire.workspace.WorkspaceRepository.Dashboard doInBackground() { return workspace.dashboard(currentSession); }
                 @Override protected void done() {
                     if (!currentSession.equals(session) || !panel.isShowing()) { return; }
-                    try { var result = get(); panel.remove(welcome); panel.add(WorkspacePanel.dashboard(result), BorderLayout.CENTER); panel.revalidate(); panel.repaint(); }
+                    try {
+                        var result = get();
+                        panel.remove(loading);
+                        panel.add(WorkspacePanel.dashboard(result), BorderLayout.CENTER);
+                        panel.revalidate();
+                        panel.repaint();
+                    }
                     catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-                    catch (ExecutionException e) { welcome.setText(e.getCause() instanceof UserError ? e.getCause().getMessage() : "Could not load overview. Select Overview to retry."); }
+                    catch (ExecutionException e) { loading.setText(e.getCause() instanceof UserError ? e.getCause().getMessage() : "Could not load overview. Select Overview to retry."); }
                 }
             }.execute();
         }
-        dashboard.addActionListener(event -> run(() -> identity.requireRole(session, profile.role()), this::home));
-        edit.addActionListener(event -> run(() -> identity.profile(session), this::editProfile));
-        logout.addActionListener(event -> {
+        showBody("Overview", panel, false);
+    }
+
+    private void updateAccount(Profile profile) {
+        account.setText(profile.name());
+        account.setToolTipText(profile.name() + " · " + profile.email());
+    }
+
+    private void buildNavigation(Role role) {
+        sidebar.setPreferredSize(new Dimension(210, 0));
+        sidebar.setBorder(BorderFactory.createEmptyBorder(18, 12, 12, 12));
+        var brand = new JLabel("SmartHire", SIDEBAR_ICON, SwingConstants.LEADING);
+        brand.setIconTextGap(8);
+        brand.setFont(brand.getFont().deriveFont(Font.BOLD, 23f));
+        brand.setForeground(Color.WHITE);
+        var context = new JLabel(WorkspaceStyle.label(role) + " workspace");
+        context.setForeground(new Color(187, 207, 225));
+        var identityHeader = new JPanel(new BorderLayout(0, 4));
+        identityHeader.setOpaque(false);
+        identityHeader.add(brand, BorderLayout.NORTH);
+        identityHeader.add(context, BorderLayout.SOUTH);
+        sidebar.add(identityHeader, BorderLayout.NORTH);
+
+        navigationLinks = new JPanel();
+        navigationLinks.setOpaque(false);
+        navigationLinks.setLayout(new BoxLayout(navigationLinks, BoxLayout.Y_AXIS));
+        var scroll = new JScrollPane(navigationLinks, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setBorder(null);
+        scroll.getViewport().setBackground(WorkspaceStyle.NAVY);
+        sidebar.add(scroll, BorderLayout.CENTER);
+
+        Runnable overview = () -> run(() -> identity.requireRole(session, role), this::home);
+        nav("Overview", overview);
+        if (jobs != null) {
+            String title = switch (role) {
+                case STUDENT -> "Find jobs";
+                case COMPANY -> "My jobs";
+                case ADMIN -> "Jobs and administration";
+            };
+            nav(title, () -> showBody(title, new JobsPanel(jobs, session, role, null, 0, applications), false));
+        }
+        if (role == Role.STUDENT) {
+            if (matches != null) { nav("Job matches", this::showMatches); }
+            if (jobs != null) { nav("Saved jobs", this::showSavedJobs); }
+            if (cvs != null) { nav("My CV", () -> showBody("My CV", new CvPanel(cvs, session, null), false)); }
+        }
+        if (applications != null && role != Role.ADMIN) {
+            String title = role == Role.STUDENT ? "My applications" : "Applicants";
+            nav(title, () -> showBody(title, new ApplicationsPanel(applications, session, role), false));
+            nav("Interviews", () -> showBody("Interviews", new InterviewsPanel(applications, session, role, null), false));
+        }
+        if (jobs != null && role != Role.ADMIN) {
+            nav("Hiring history", () -> showBody("Hiring history", new HiringHistoryPanel(jobs, session, role,
+                    applications == null ? null : id -> showBody("Applicants", new ApplicationsPanel(applications, session, role, id), false)), false));
+        }
+        if (role == Role.ADMIN) {
+            if (cvApprovals != null) {
+                nav("CV review", () -> showBody("CV review", new CvApprovalPanel(cvApprovals, session), false));
+            }
+            if (workspace != null) {
+                nav("Accounts", () -> showBody("Accounts", new WorkspacePanel(workspace, session, WorkspacePanel.Page.ACCOUNTS), false));
+                nav("Data management", () -> showBody("Data management", new WorkspacePanel(workspace, session, WorkspacePanel.Page.DATA), false));
+                nav("Activity log", () -> showBody("Activity log", new WorkspacePanel(workspace, session, WorkspacePanel.Page.ACTIVITY), false));
+                nav("Application monitoring", () -> showBody("Application monitoring",
+                        new WorkspacePanel(workspace, session, WorkspacePanel.Page.MONITOR), false));
+            }
+        }
+        if (workspace != null) {
+            nav("Notifications", () -> showBody("Notifications",
+                    new WorkspacePanel(workspace, session, WorkspacePanel.Page.NOTICES), false));
+        }
+        nav("My profile", () -> run(() -> identity.profile(session), this::editProfile));
+
+        var footer = new JPanel(new BorderLayout(0, 8));
+        footer.setOpaque(false);
+        account = new JLabel();
+        account.setForeground(Color.WHITE);
+        footer.add(account, BorderLayout.NORTH);
+        var signOut = WorkspaceStyle.button("Sign out", () -> {
             identity.logout(session);
             session = null;
             login();
         });
-        showBody(switch (profile.role()) {
-            case STUDENT -> "Student home";
-            case COMPANY -> "Company home";
-            case ADMIN -> "Admin home";
-        }, panel);
-        getRootPane().setDefaultButton(null);
-        status.setText("Signed in as " + profile.email());
+        footer.add(signOut, BorderLayout.SOUTH);
+        sidebar.add(footer, BorderLayout.SOUTH);
+        sidebar.setVisible(true);
+    }
+
+    private void nav(String label, Runnable action) {
+        var button = WorkspaceStyle.button(label, action);
+        button.setHorizontalAlignment(SwingConstants.LEADING);
+        button.setForeground(Color.WHITE);
+        button.setBackground(WorkspaceStyle.NAVY);
+        button.setBorder(BorderFactory.createEmptyBorder(3, 9, 3, 9));
+        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        button.setPreferredSize(new Dimension(180, 36));
+        button.setToolTipText(label);
+        navigationLinks.add(button);
+        navigationLinks.add(Box.createVerticalStrut(4));
+        navigation.put(label, button);
+    }
+
+    private void select(String section) {
+        navigation.forEach((name, button) -> {
+            boolean current = name.equals(section);
+            button.setBackground(current ? WorkspaceStyle.TEAL : WorkspaceStyle.NAVY);
+            button.setFont(button.getFont().deriveFont(current ? Font.BOLD : Font.PLAIN));
+            button.getAccessibleContext().setAccessibleDescription(current ? "Current section" : null);
+        });
     }
 
     private void editProfile(Profile profile) {
-        JPanel form = form();
+        JPanel form = WorkspaceStyle.form();
         JTextField name = new JTextField(profile.name());
         JTextField phone = new JTextField(profile.phone());
         JTextField affiliation = new JTextField(profile.affiliation());
@@ -283,15 +373,14 @@ public final class SmartHireWindow extends JFrame {
         field(form, "About (optional, up to 2,000 characters)", new JScrollPane(about));
         JButton save = new JButton("Save profile");
         JButton back = new JButton("Back to overview");
-        form.add(save);
-        form.add(Box.createVerticalStrut(12));
-        form.add(back);
+        form.add(formActions(save, back));
         save.addActionListener(event -> {
             String newName = name.getText();
             String newPhone = phone.getText();
             String newAffiliation = affiliation.getText();
             String newAbout = about.getText();
             run(() -> identity.saveProfile(session, newName, newPhone, newAffiliation, newAbout), saved -> {
+                updateAccount(saved);
                 editProfile(saved);
                 status.setText("Profile saved.");
             });
@@ -303,39 +392,62 @@ public final class SmartHireWindow extends JFrame {
     }
 
     private void showMatches() {
-        showBody("Job matches", new MatchesPanel(matches, session,
-                () -> run(() -> identity.profile(session), this::home),
-                id -> showBody("Job details", new JobsPanel(jobs, session, Role.STUDENT, this::showMatches, id, applications))));
+        showBody("Job matches", new MatchesPanel(matches, cvs, session,
+                id -> showBody("Job details",
+                        new JobsPanel(jobs, session, Role.STUDENT, this::showMatches, id, applications), false),
+                id -> jobs.saveBookmark(session, id),
+                () -> showBody("My CV", new CvPanel(cvs, session, this::showMatches), false)), false);
+    }
+
+    private void showSavedJobs() {
+        showBody("Saved jobs", new SavedJobsPanel(jobs, session,
+                id -> showBody("Saved jobs", new JobsPanel(jobs, session, Role.STUDENT, this::showSavedJobs, id, applications,
+                        "Back to saved jobs"), false),
+                applications == null ? null : id -> showBody("My applications",
+                        new ApplicationsPanel(applications, session, Role.STUDENT, id), false)), false);
     }
 
     private void showBody(String title, Component body) {
+        showBody(title, body, true);
+    }
+
+    private void showBody(String title, Component body, boolean scrollable) {
         content.removeAll();
+        getRootPane().setDefaultButton(null);
+        select(title.equals("Job details") ? "Job matches" : title);
         JLabel heading = new JLabel(title);
-        heading.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        heading.setFont(heading.getFont().deriveFont(Font.BOLD, 26f));
         content.add(heading, BorderLayout.NORTH);
-        JScrollPane scroll = new JScrollPane(body);
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        content.add(scroll, BorderLayout.CENTER);
+        if (scrollable) {
+            content.add(WorkspaceStyle.scroll(body), BorderLayout.CENTER);
+        } else {
+            content.add(body, BorderLayout.CENTER);
+        }
+        status.setForeground(WorkspaceStyle.MUTED);
+        status.setText("");
+        content.add(status, BorderLayout.SOUTH);
         content.revalidate();
         content.repaint();
     }
 
-    private static JPanel form() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        return panel;
+    private static JPanel centered(JPanel form) {
+        var frame = new JPanel(new GridBagLayout());
+        frame.add(form);
+        return frame;
+    }
+
+    private static JPanel formActions(JButton primary, JButton secondary) {
+        var actions = WorkspaceStyle.actions();
+        actions.setOpaque(false);
+        actions.setAlignmentX(Component.LEFT_ALIGNMENT);
+        WorkspaceStyle.primary(primary);
+        actions.add(primary);
+        actions.add(secondary);
+        return actions;
     }
 
     private static void field(JPanel panel, String label, javax.swing.JComponent input) {
-        JLabel caption = new JLabel(label);
-        caption.setLabelFor(input);
-        caption.setAlignmentX(Component.LEFT_ALIGNMENT);
-        input.setAlignmentX(Component.LEFT_ALIGNMENT);
-        input.setMaximumSize(new Dimension(Integer.MAX_VALUE, input instanceof JScrollPane ? 140 : 36));
-        panel.add(caption);
-        panel.add(Box.createVerticalStrut(6));
-        panel.add(input);
-        panel.add(Box.createVerticalStrut(18));
+        WorkspaceStyle.field(panel, label, input);
     }
 
     private <T> void run(Callable<T> task, Consumer<T> success) {
@@ -347,7 +459,8 @@ public final class SmartHireWindow extends JFrame {
             return;
         }
         busy = true;
-        enabled(content, false);
+        Runnable restoreContent = WorkspaceStyle.disable(content);
+        Runnable restoreSidebar = WorkspaceStyle.disable(sidebar);
         status.setForeground(Color.DARK_GRAY);
         status.setText("Working…");
         new SwingWorker<T, Void>() {
@@ -359,7 +472,8 @@ public final class SmartHireWindow extends JFrame {
             @Override
             protected void done() {
                 busy = false;
-                enabled(content, true);
+                restoreContent.run();
+                restoreSidebar.run();
                 try {
                     T result = get();
                     status.setText("Ready");
@@ -376,15 +490,6 @@ public final class SmartHireWindow extends JFrame {
                 }
             }
         }.execute();
-    }
-
-    private static void enabled(Component component, boolean value) {
-        component.setEnabled(value);
-        if (component instanceof java.awt.Container container) {
-            for (Component child : container.getComponents()) {
-                enabled(child, value);
-            }
-        }
     }
 
     private record Services(IdentityService identity, smarthire.jobs.JobService jobs, smarthire.cv.CvService cvs,

@@ -54,6 +54,9 @@ public final class WorkflowFixture implements AutoCloseable {
         var account = repo.create(UUID.randomUUID() + "@workflow.example", hash, role, "Fictional Workflow Test"); accounts.add(account.id());
         return identity.login(account.email(), "Workflow-test!21".toCharArray());
     }
+    public UUID newStudent() {
+        return account(new JdbcAccounts(database), Role.STUDENT, Passwords.hash("Workflow-test!21".toCharArray()));
+    }
     public Job.Details details(List<Job.Requirement> requirements) {
         return new Job.Details("Fictional workflow role", "Fictional job description", category, "Dhaka", BigDecimal.ZERO, BigDecimal.TEN, requirements);
     }
@@ -78,6 +81,7 @@ public final class WorkflowFixture implements AutoCloseable {
         execute("UPDATE scoring_policy_current SET version=? WHERE id=1", initialPolicy);
         for (String version : policies) { execute("DELETE FROM scoring_policies WHERE version=?", version); }
         for (long id : accounts) {
+            execute("DELETE FROM admin_activity WHERE admin_id=?", id);
             var circulars = new ArrayList<String>();
             try (var connection = database.connect(); var query = connection.prepareStatement("SELECT c.document_id FROM job_circular_versions c JOIN jobs j ON j.id=c.job_id WHERE j.company_id=?")) {
                 query.setLong(1, id); try (var rows = query.executeQuery()) { while (rows.next()) { circulars.add(rows.getString(1)); } }

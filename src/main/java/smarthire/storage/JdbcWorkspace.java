@@ -7,6 +7,8 @@ import java.util.function.Function;
 import smarthire.identity.*;
 import smarthire.applications.Application;
 import smarthire.workspace.WorkspaceRepository;
+import smarthire.workspace.AdminData;
+import smarthire.workspace.AdminActivity;
 import static smarthire.workspace.WorkspaceRepository.*;
 
 public final class JdbcWorkspace implements WorkspaceRepository {
@@ -54,7 +56,16 @@ public final class JdbcWorkspace implements WorkspaceRepository {
                 return List.copyOf(result);
             } catch (SQLException e) { throw Database.unavailable(); }
         }
-        @Override public void setActive(long id, boolean active) { update("UPDATE users SET active=? WHERE id=?", active, id); }
+        @Override public void setActive(long id, boolean active) {
+            update("UPDATE users SET active=? WHERE id=?", active, id);
+            if (!active) {
+                var account = accounts().stream().filter(a -> a.id() == id).findFirst().orElseThrow();
+                new JdbcInterviews(connection).cancelForAccount(id, account.role() == Role.COMPANY, java.time.Instant.now());
+            }
+        }
+        @Override public AdminData.Store adminData() { return new JdbcAdminData(connection); }
+        @Override public void audit(long adminId, AdminActivity.Change change) { JdbcAdminActivity.add(connection, adminId, change); }
+        @Override public AdminActivity.Page activity(AdminActivity.Filter filter) { return JdbcAdminActivity.page(connection, filter); }
         @Override public List<ApplicationSummary> monitor(Filter f) {
             StringBuilder sql = new StringBuilder("SELECT a.*,j.title,j.company_id,u.display_name company FROM applications a JOIN jobs j ON j.id=a.job_id JOIN users u ON u.id=j.company_id WHERE 1=1");
             var values = new ArrayList<Object>();
@@ -91,7 +102,9 @@ public final class JdbcWorkspace implements WorkspaceRepository {
                 counts.put("Approved jobs", count("SELECT COUNT(*) FROM jobs WHERE status='APPROVED' AND company_id=" + id));
                 counts.put("Pending jobs", count("SELECT COUNT(*) FROM jobs WHERE status='PENDING' AND company_id=" + id));
             } else {
-                counts.put("Available jobs", count("SELECT COUNT(*) FROM jobs j JOIN companies c ON c.user_id=j.company_id JOIN users u ON u.id=c.user_id WHERE j.status='APPROVED' AND c.verified=TRUE AND u.active=TRUE"));
+                counts.put("Available jobs", count("SELECT COUNT(*) FROM jobs j JOIN companies c ON c.user_id=j.company_id "
+                        + "JOIN users u ON u.id=c.user_id WHERE j.status='APPROVED' AND c.verified=TRUE AND u.active=TRUE AND NOT "
+                        + JdbcJobs.FILLED_JOB));
                 counts.put("Reviewed CV versions", count("SELECT COUNT(*) FROM cv_versions WHERE student_id=" + id));
             }
             var statuses = new LinkedHashMap<String, Long>();

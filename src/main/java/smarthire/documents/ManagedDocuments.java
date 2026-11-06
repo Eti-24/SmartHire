@@ -132,6 +132,16 @@ public final class ManagedDocuments implements AutoCloseable {
 
     public record Recovery(int removedAbandonedFiles, List<UUID> unavailableReferences) { }
 
+    /** Remove one generated file after its metadata was erased in a committed transaction. */
+    public synchronized void removeUnreferenced(UUID id, StoredDocument.Format format) {
+        checkOpen();
+        Path file = path(id, format);
+        if (!pending.contains(id) && references.find(id).isEmpty()
+                && Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
+            cleanup(file);
+        }
+    }
+
     public final class Pending implements AutoCloseable {
         private final StoredDocument document;
         private boolean finished;

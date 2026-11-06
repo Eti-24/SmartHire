@@ -10,6 +10,8 @@ import java.util.UUID;
 import java.util.function.Function;
 import smarthire.applications.Application;
 import smarthire.applications.ApplicationRepository;
+import smarthire.applications.Interview;
+import smarthire.applications.RecruiterFeedback;
 import smarthire.cv.CvRepository;
 import smarthire.identity.Profile;
 import smarthire.identity.Role;
@@ -35,6 +37,58 @@ public final class JdbcApplications implements ApplicationRepository {
     private static final class Session implements Store {
         private final Connection connection;
         Session(Connection connection) { this.connection = connection; }
+        @Override public List<Interview> interviewHistory(UUID id) { return new JdbcInterviews(connection).history(id); }
+        @Override public List<Interview> currentInterviews(Long studentId, Long companyId, Long jobId) {
+            return new JdbcInterviews(connection).current(studentId, companyId, jobId);
+        }
+        @Override public void addInterview(Interview event, long studentId, long companyId) {
+            new JdbcInterviews(connection).add(event, studentId, companyId);
+        }
+
+        @Override public RecruiterFeedback feedback(UUID id) {
+            String sql = "SELECT n.*,f.interview_revision,f.technical,f.communication,f.role_fit,f.comments FROM application_notes n"
+                    + " LEFT JOIN interview_feedback f ON f.application_id=n.application_id WHERE n.application_id=?";
+            try (var query = connection.prepareStatement(sql)) {
+                query.setString(1, id.toString());
+                try (var row = query.executeQuery()) {
+                    if (!row.next()) { return new RecruiterFeedback(0, "", null, null); }
+                    var interview = row.getObject("interview_revision", Integer.class);
+                    var scorecard = interview == null ? null : new RecruiterFeedback.Scorecard(interview,
+                            row.getObject("technical", Integer.class), row.getObject("communication", Integer.class),
+                            row.getObject("role_fit", Integer.class), row.getString("comments"));
+                    var updated = row.getObject("updated_utc", java.time.LocalDateTime.class).toInstant(java.time.ZoneOffset.UTC);
+                    return new RecruiterFeedback(row.getInt("revision"), row.getString("notes"), scorecard, updated);
+                }
+            } catch (SQLException e) { throw Database.unavailable(); }
+        }
+
+        @Override public void saveFeedback(UUID id, RecruiterFeedback feedback) {
+            String key = id.toString();
+            try (var query = connection.prepareStatement("INSERT INTO application_notes VALUES (?,?,?,?)"
+                    + " AS incoming ON DUPLICATE KEY UPDATE revision=incoming.revision,notes=incoming.notes,updated_utc=incoming.updated_utc")) {
+                query.setString(1, key);
+                query.setInt(2, feedback.revision());
+                query.setString(3, feedback.notes());
+                query.setObject(4, java.time.LocalDateTime.ofInstant(feedback.updatedAt(), java.time.ZoneOffset.UTC));
+                query.executeUpdate();
+            } catch (SQLException e) { throw Database.unavailable(); }
+            var score = feedback.scorecard();
+            String sql = score == null ? "DELETE FROM interview_feedback WHERE application_id=?"
+                    : "INSERT INTO interview_feedback VALUES (?,?,1,?,?,?,?) AS incoming ON DUPLICATE KEY UPDATE"
+                      + " interview_revision=incoming.interview_revision,technical=incoming.technical,communication=incoming.communication,"
+                      + " role_fit=incoming.role_fit,comments=incoming.comments";
+            try (var query = connection.prepareStatement(sql)) {
+                query.setString(1, key);
+                if (score != null) {
+                    query.setInt(2, score.interviewRevision());
+                    query.setObject(3, score.technical());
+                    query.setObject(4, score.communication());
+                    query.setObject(5, score.roleFit());
+                    query.setString(6, score.comments());
+                }
+                query.executeUpdate();
+            } catch (SQLException e) { throw Database.unavailable(); }
+        }
         @Override public JobRepository.Store jobs() { return new JdbcJobs.Session(connection); }
         @Override public CvRepository.Store cvs(long studentId) { return new JdbcCvs.Session(connection, studentId); }
         @Override public Profile activeActor(long id, Role role) {
@@ -79,7 +133,8 @@ public final class JdbcApplications implements ApplicationRepository {
         }
         @Override public void status(UUID id, Application.Status status) {
             Application previous = lock(id).orElseThrow();
-            update("UPDATE applications SET status=? WHERE id=?", status.name(), id.toString());
+            update("UPDATE applications SET status=?,hired_at=CASE WHEN ?='HIRED' THEN CURRENT_TIMESTAMP(6) ELSE hired_at END WHERE id=?",
+                    status.name(), status.name(), id.toString());
             if (previous.status() != status) { notifyParticipants(previous, "Application " + status.name().toLowerCase(java.util.Locale.ROOT)); }
         }
         private void notifyParticipants(Application a, String event) {
