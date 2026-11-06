@@ -96,7 +96,7 @@ Maven downloads dependencies on the first build. With Java and Maven on `PATH`, 
 
 - `mvn test` runs unit tests. Create a separate `smarthire_test` database with the same grants before running `mvn '-Dsmarthire.integration=true' test`. The app and tests read the local database credentials from `.local/application.properties`.
 - The [reproduction guide](docs/reproduce-demo.md) covers the project-local tools, optional Aiven profile, database smoke test, and backups.
-- The [database diagram](docs/database/er-diagram.html) shows the MySQL schema. [Implementation status](docs/implementation-status.md) records test results and manual checks.
+- The database diagram is available as [HTML](docs/database/er-diagram.html), [SVG](docs/database/er-diagram.svg), and [Mermaid source](docs/database/er-diagram.mmd). The [MySQL schema and migrations](src/main/resources/db) are in the app resources. [Implementation status](docs/implementation-status.md) records test results and manual checks.
 
 ## Features
 
@@ -152,3 +152,38 @@ Maven downloads dependencies on the first build. With Java and Maven on `PATH`, 
 | Recruitment reports | Companies and admins can filter applications and review conversion rates, average times between recorded events, and current vacancy counts. |
 | Local and cloud database setup | Run SmartHire with local MySQL or use the separate Windows launcher for an Aiven MySQL database. |
 | Demo data | Load fictional accounts and jobs, then use the included CVs and job circular to try the recruitment workflow. |
+
+## How job matching works
+
+### What goes into a match
+
+When you upload a PDF or Word CV, SmartHire extracts text and suggests qualifications. You can correct those suggestions and add missing evidence in **My CV**. Confirming the review saves a CV version. **Job matches** uses the latest confirmed version, including one still waiting for admin approval. If you haven't confirmed a review, the app asks you to do that first.
+
+The score uses the confirmed qualifications and the structured requirements on the job posting. The company sets those requirements when it creates the posting. Recommendations consider approved jobs that are still accepting applications from active, verified companies. A closing deadline or a filled final vacancy removes the posting from recommendations.
+
+### How the percentage is calculated
+
+Each category earns a fraction from 0 to 1. The default scoring policy is `default-v1`.
+
+| Category | Default weight | How it earns credit |
+| --- | ---: | --- |
+| Skills | 40 | Add the weights of the listed skills the student has, then divide by the total weight of the listed skills. A skill marked Required counts twice as much as one marked Optional. Technical and soft skills use the same rule. The skill catalog maps recognized aliases to the same skill. |
+| Education | 20 | Give full credit if the confirmed degree meets the minimum and the field matches when one is specified. The degree order is Secondary, Diploma, Bachelor, Master, Doctorate. Fields are compared after normalizing Unicode, case, and spaces. Abbreviations such as CS are distinct from Computer Science. |
+| Experience | 15 | Divide the number of relevant months by the minimum requested, up to full credit. A work entry counts if at least one of its skill tags matches the job's experience tags. The app counts both end months and counts each calendar month once. For example, January through April plus March through June counts as six months. For ongoing work, the end month is fixed when the CV review is confirmed. |
+| Projects | 15 | Divide matched project skills by the number of project skills the job lists. A skill has to appear on a confirmed project to earn credit here. |
+| Certifications | 10 | Divide matched certifications by the number the job lists. Names must match after normalizing Unicode, case, and spaces. |
+
+The app divides each participating category's weight by the sum of the weights of categories with scored requirements. A job with only skills and education therefore uses weights of `40 / 60` and `20 / 60`. A zero-month experience requirement and experience tags alone earn no points. Multiply each category fraction by its adjusted weight and by 100, then add the resulting percentage points. The app keeps the unrounded score for sorting and displays two decimal places. Admins can activate new weights. A policy must give each affected job at least one scored category with a positive weight.
+
+### Eligibility and a worked example
+
+The company can mark individual requirements **Mandatory**. Every mandatory check has to pass for the student to be eligible. The **Required** skill priority controls scoring weight, while the **Mandatory** checkbox controls eligibility. Degree level and field can each have their own mandatory check.
+
+In the demo walkthrough, a job lists Java as Optional and Mandatory. SQL, communication, and teamwork are Required, so each has a skill weight of two. The posting also asks for a Bachelor's degree. A student with the degree and all three Required skills earns `6 / 7` for skills and full credit for education. The final score is `100 × [(6 / 7 × 40 / 60) + (1 × 20 / 60)] = 90.48%` after rounding. The student is ineligible because Java is missing. The [demo walkthrough](docs/demo-guide.md#student-journey-and-expected-results) has the sample CVs and two more outcomes for that posting.
+
+### Recommendations, comparisons, and applications
+
+- **Job matches** puts eligible jobs first, then sorts each group by descending score and uses job ID to break ties. The app recalculates when you refresh or open a match. **Why this match?** shows what matched and what's missing. The **Score details** tab includes category weights, points, counted experience, and mandatory checks. **What to improve** lists gaps you can review in My CV.
+- **Compare two jobs** uses the same confirmed CV and policy for both postings. It also compares the extracted CV text with each job description using TF-IDF and cosine similarity. TF-IDF gives more weight to terms that occur often in one document and in fewer documents across the comparison. Cosine similarity measures the overlap between the resulting term vectors. Empty text gives zero similarity. The similarity figure is displayed separately from the score and eligibility.
+- **Apply** rechecks the job's availability, approval of the exact CV version, and the mandatory requirements. A student can apply once per job. The application keeps the submitted CV and contact details along with the score, explanation, and policy used at submission.
+- **Applicant rankings** use the current policy to score each applicant's submitted qualifications against the job's frozen requirements. Within a posting, the highest score comes first. Ties go to the earlier submission, then to application ID. A new CV or a change to the weights leaves the original assessment in the application history.
