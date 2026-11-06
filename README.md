@@ -44,15 +44,51 @@ Set-Location SmartHire
 .\scripts\run.ps1
 ```
 
-The setup script prints each step. It installs portable Java 21, Maven, and MySQL under `.tools`, configures and starts MySQL on port `3306`, and builds the app. `-SeedDemo` loads the sample accounts and jobs. You can rerun setup with the same database. If another MySQL server already uses port `3306`, use the manual setup below.
+The setup script prints each step. It installs portable Java 21, Maven, and MySQL under `.tools`, configures and starts MySQL on port `3306`, and builds the app. `-SeedDemo` loads the sample accounts and jobs. You can rerun setup with the same database. After a restart, run `.\scripts\start-mysql.ps1` before opening the app. If you already have MySQL running on port `3306`, use the Workbench steps below.
 
-After a restart, run `.\scripts\start-mysql.ps1` before opening the app. To use an existing Java, [Maven](https://maven.apache.org/install.html), and MySQL installation, follow [Configure MySQL](docs/windows-release.md#configure-mysql) in the checkout, then build and run from the project root.
+## Set up local MySQL in Workbench
 
-```powershell
-mvn package dependency:copy-dependencies '-DincludeScope=runtime'
-java -cp 'target/classes;target/dependency/*' smarthire.Main --seed-demo
-java -cp 'target/classes;target/dependency/*' smarthire.Main
-```
+Install [MySQL Workbench](https://dev.mysql.com/downloads/workbench/). If you already ran `setup-local.ps1`, start the project’s MySQL with `.\scripts\start-mysql.ps1` and skip to step 4. The setup script created the database and application account. Use the generated password in `.local/database.json` for the Workbench connection.
+
+1. **Start MySQL Server.** Install [MySQL Community Server 8.4 LTS](https://dev.mysql.com/downloads/mysql/8.4.html). In MySQL Configurator, enable TCP/IP on port `3306`, set a root password, and configure MySQL as a Windows service. Check that the service is running in Windows **Services**. Workbench connects to the running server.
+
+2. **Connect as an administrator.** On the Workbench home screen, click **+** next to **MySQL Connections**. Enter `SmartHire setup` as the connection name, choose **Standard (TCP/IP)**, set **Hostname** to `127.0.0.1`, **Port** to `3306`, and **Username** to `root`. Leave **Default Schema** blank. Click **Test Connection**, enter the MySQL root password, then click **OK** and open the connection. [Workbench connection tutorial](https://dev.mysql.com/doc/workbench/en/wb-getting-started-tutorial-create-connection.html)
+
+3. **Create the database and app user.** Paste the SQL below into the query tab. Replace `YOUR_LOCAL_PASSWORD` with a new password for the `smarthire` account. Use a password without quotes, backslashes, or whitespace so it works in both examples. Click the lightning bolt to run the script. If this exact user already exists, omit `CREATE USER` and use its existing password in the next steps.
+
+   ```sql
+   CREATE DATABASE IF NOT EXISTS smarthire CHARACTER SET utf8mb4;
+   CREATE USER 'smarthire'@'127.0.0.1' IDENTIFIED BY 'YOUR_LOCAL_PASSWORD';
+   GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
+       ON smarthire.* TO 'smarthire'@'127.0.0.1';
+   ```
+
+4. **Test the app account.** Add a second Workbench connection called `SmartHire local`. Use the same hostname and port, with **Username** `smarthire` and **Default Schema** `smarthire`. Click **Test Connection** and enter the app user’s password. Open the connection and run `SELECT DATABASE(), CURRENT_USER();`. The selected database should be `smarthire`.
+
+5. **Give SmartHire the connection settings.** In the extracted local ZIP folder or the source checkout, create `.local/application.properties`. Save it as a plain-text `.properties` file with the same password you used in step 4. If the setup script already created the file in your checkout, use that file as is. Keep it private.
+
+   ```properties
+   user=smarthire
+   password=YOUR_LOCAL_PASSWORD
+   ```
+
+6. **Start SmartHire.** If you used `setup-local.ps1`, launch from the checkout with `.\scripts\run.ps1`. If you downloaded the [local Windows ZIP](https://github.com/Eti-24/SmartHire/releases/latest), install [Java 21](https://adoptium.net/temurin/releases/?version=21) and run these commands from the extracted folder. The seed command is optional.
+
+   ```powershell
+   .\SmartHire.cmd --check-database
+   .\SmartHire.cmd --seed-demo
+   .\SmartHire.cmd
+   ```
+
+   If you’re building from source with your own MySQL installation, put Java 21 and [Maven](https://maven.apache.org/install.html) on `PATH`. Run these commands from the checkout. Omit the `--seed-demo` command if you want to start with an empty database.
+
+   ```powershell
+   mvn package dependency:copy-dependencies '-DincludeScope=runtime'
+   java -cp 'target/classes;target/dependency/*' smarthire.Main --seed-demo
+   java -cp 'target/classes;target/dependency/*' smarthire.Main
+   ```
+
+7. **Check the tables.** In Workbench, refresh **Schemas**, then expand **smarthire > Tables**. SmartHire creates its tables on first launch or when you run the seed. If Workbench cannot connect, check that MySQL is listening on `127.0.0.1:3306`. If Workbench connects and SmartHire reports an error, check `.local/application.properties` in the folder you launched from.
 
 Maven downloads dependencies on the first build. With Java and Maven on `PATH`, run `pwsh -File scripts/package-release.ps1` to build the local Windows ZIP in `target`.
 
