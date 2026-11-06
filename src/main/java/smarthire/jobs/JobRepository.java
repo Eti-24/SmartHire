@@ -1,6 +1,7 @@
 package smarthire.jobs;
 
 import java.util.List;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Function;
 import smarthire.skills.Skill;
@@ -21,10 +22,14 @@ public interface JobRepository {
         List<Skill> skills();
         void saveSkill(Skill skill);
         List<Job> jobs();
-        List<Job> unfilledJobs();
+        List<Job> search(JobSearch criteria, Long companyId, Instant availableAt);
+        List<SavedSearch> savedSearches(long studentId);
+        void saveSearch(long studentId, SavedSearch search);
+        void deleteSearch(long studentId, long searchId);
+        void notifySavedSearches(long jobId, Instant now);
         List<Job.HiringRecord> hiringHistory(Long companyId);
         List<Job.CompanyHire> companyHires(long companyId);
-        List<JobService.SavedJob> savedJobs(long studentId);
+        List<JobService.SavedJob> savedJobs(long studentId, Instant now);
         void saveBookmark(long studentId, Job job);
         void removeBookmark(long studentId, long jobId);
         Optional<Job> lockJob(long id);

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     email VARCHAR(254) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    credential_version BIGINT NOT NULL DEFAULT 1,
     role ENUM('STUDENT', 'COMPANY', 'ADMIN') NOT NULL,
     active BOOLEAN NOT NULL DEFAULT TRUE,
     display_name VARCHAR(120) NOT NULL,
@@ -49,7 +50,10 @@ CREATE TABLE IF NOT EXISTS skill_aliases (
 CREATE TABLE IF NOT EXISTS jobs (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     vacancy_count INT NOT NULL DEFAULT 1,
+    application_deadline_at DATETIME(6) NULL,
+    application_deadline_zone VARCHAR(80) NULL,
     CONSTRAINT job_positive_vacancy_count CHECK (vacancy_count > 0),
+    CONSTRAINT job_deadline_has_zone CHECK ((application_deadline_at IS NULL) = (application_deadline_zone IS NULL)),
     company_id BIGINT NOT NULL,
     title VARCHAR(160) NOT NULL,
     description TEXT NOT NULL,

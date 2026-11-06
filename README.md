@@ -6,7 +6,9 @@ Open a match to see which qualifications raised the score and which mandatory re
 
 ## Run the Windows release with Aiven
 
-1. Install the [Java 21 JDK](https://adoptium.net/temurin/releases/?version=21) and extract the Windows ZIP from [GitHub Releases](https://github.com/Eti-24/SmartHire/releases).
+For the published ZIP, follow the instructions on the [release page](https://github.com/Eti-24/SmartHire/releases). To build and run the cloud ZIP from this checkout, use these steps.
+
+1. Install the [Java 21 JDK](https://adoptium.net/temurin/releases/?version=21), load `scripts/dev-env.ps1`, and run `.\scripts\package-release.ps1 -Cloud`. Extract the resulting ZIP from `target`.
 2. Follow [Connect to Aiven](docs/windows-release.md#connect-to-aiven) to add your connection settings and CA certificate. The ZIP includes the same instructions.
 3. Open PowerShell in the extracted folder. Check the connection, then launch the app.
 
@@ -15,7 +17,7 @@ Open a match to see which qualifications raised the score and which mandatory re
 .\SmartHire-Cloud.cmd
 ```
 
-The cloud launcher needs Java and access to the Aiven service. The ZIP also supports [local MySQL](docs/windows-release.md#use-local-mysql) through `SmartHire.cmd`. Sign in to GitHub with an account that has access to this private repository to download it.
+For a fresh or older Aiven schema, follow the database upgrade steps in the setup guide before launching. Use the separate local Windows ZIP with [local MySQL](docs/windows-release.md#use-local-mysql).
 
 ## Try the demo
 
@@ -36,7 +38,7 @@ The [demo walkthrough](docs/demo-guide.md) gives an example job and the scores t
 On Windows x64, install [Git](https://git-scm.com/downloads) and [PowerShell 7](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows). MySQL also needs the [Microsoft Visual C++ x64 Redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist). Open PowerShell 7 and run these commands.
 
 ```powershell
-git clone --branch v0.1.1 https://github.com/Eti-24/SmartHire.git
+git clone https://github.com/Eti-24/SmartHire.git
 Set-Location SmartHire
 .\scripts\setup-local.ps1 -SeedDemo
 .\scripts\run.ps1
@@ -52,7 +54,7 @@ java -cp 'target/classes;target/dependency/*' smarthire.Main --seed-demo
 java -cp 'target/classes;target/dependency/*' smarthire.Main
 ```
 
-Maven downloads dependencies on the first build. To build the Windows ZIP, run `pwsh -File scripts/package-release.ps1` with Java and Maven on `PATH`. The ZIP is written to `target`.
+Maven downloads dependencies on the first build. With Java and Maven on `PATH`, run `pwsh -File scripts/package-release.ps1` to build the local Windows ZIP in `target`.
 
 ## Tests and project guides
 

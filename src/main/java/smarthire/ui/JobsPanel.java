@@ -2,6 +2,8 @@ package smarthire.ui;
 
 import java.awt.BorderLayout;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -15,6 +17,8 @@ import smarthire.identity.Role;
 import smarthire.identity.UserError;
 import smarthire.jobs.Job;
 import smarthire.jobs.JobService;
+import smarthire.jobs.JobSearch;
+import smarthire.jobs.SavedSearch;
 import smarthire.skills.Skill;
 import static smarthire.jobs.Job.*;
 
@@ -25,6 +29,7 @@ public final class JobsPanel extends JPanel {
     private final Role role;
     private final long initialJobId;
     private final smarthire.applications.ApplicationService applications;
+    private final JobSearch initialSearch;
     private final JPanel body = new JPanel(new BorderLayout(10, 10));
     private final JTextArea message = WorkspaceStyle.message("Loading jobs…");
     private final JButton back = new JButton("Back to overview");
@@ -48,10 +53,16 @@ public final class JobsPanel extends JPanel {
 
     JobsPanel(JobService service, UUID session, Role role, Runnable onBack, long initialJobId,
             smarthire.applications.ApplicationService applications, String backLabel) {
+        this(service, session, role, onBack, initialJobId, applications, backLabel, new JobSearch("", null));
+    }
+
+    JobsPanel(JobService service, UUID session, Role role, Runnable onBack, long initialJobId,
+            smarthire.applications.ApplicationService applications, String backLabel, JobSearch initialSearch) {
         super(new BorderLayout(10, 10));
         this.service = service; this.session = session; this.role = role;
         this.initialJobId = initialJobId;
         this.applications = applications;
+        this.initialSearch = initialSearch;
         back.setText(backLabel);
         if (onBack != null) {
             back.addActionListener(event -> onBack.run());
@@ -65,15 +76,19 @@ public final class JobsPanel extends JPanel {
     private void load() {
         work(() -> new Catalog(service.categories(session), service.skills(session)), catalog -> {
             categories = catalog.categories(); skills = catalog.skills();
-            if (initialJobId == 0) { browse("", null); }
+            if (initialJobId == 0) { browse(initialSearch); }
             else { work(() -> service.open(session, initialJobId), this::details); }
         });
     }
 
     private void browse(String query, Long categoryId) {
-        work(() -> service.list(session, query, categoryId), jobs -> {
+        browse(new JobSearch(query, categoryId));
+    }
+
+    private void browse(JobSearch criteria) {
+        work(() -> service.list(session, criteria), jobs -> {
             var controls = WorkspaceStyle.actions();
-            var search = new JTextField(query, 12);
+            var search = new JTextField(criteria.title(), 12);
             var titleLabel = new JLabel("Job title");
             titleLabel.setLabelFor(search);
             var category = new JComboBox<Category>();
@@ -81,13 +96,18 @@ public final class JobsPanel extends JPanel {
             category.setPrototypeDisplayValue(new Category(0, "Select a job category"));
             for (Category item : categories) {
                 category.addItem(item);
-                if (categoryId != null && item.id() == categoryId) { category.setSelectedItem(item); }
+                if (criteria.categoryId() != null && item.id() == criteria.categoryId()) { category.setSelectedItem(item); }
             }
             var categoryLabel = new JLabel("Category");
             categoryLabel.setLabelFor(category);
-            Runnable filter = () -> {
+            java.util.function.Supplier<JobSearch> query = () -> {
                 var selected = (Category) category.getSelectedItem();
-                browse(search.getText(), selected.id() == 0 ? null : selected.id());
+                return new JobSearch(search.getText(), selected.id() == 0 ? null : selected.id(), criteria.location(),
+                        criteria.minimumSalary(), criteria.maximumSalary(), criteria.closingFrom(), criteria.closingBefore());
+            };
+            Runnable filter = () -> {
+                try { browse(query.get()); }
+                catch (UserError error) { message.setText(error.getMessage()); }
             };
             search.addActionListener(event -> filter.run());
             controls.add(titleLabel);
@@ -95,6 +115,26 @@ public final class JobsPanel extends JPanel {
             controls.add(categoryLabel);
             controls.add(category);
             button(controls, "Search", filter);
+            if (role == Role.STUDENT) {
+                button(controls, "More filters", () -> {
+                    try {
+                        var updated = JobSearchForm.edit(this, query.get());
+                        if (updated != null) { browse(updated); }
+                    } catch (UserError error) { message.setText(error.getMessage()); }
+                });
+                button(controls, "Save this search", () -> {
+                    try {
+                        var current = query.get();
+                        String name = JOptionPane.showInputDialog(this, "Name this saved search");
+                        if (name != null) {
+                            work(() -> {
+                                service.saveSearch(session, new SavedSearch(0, name, current, true));
+                                return true;
+                            }, saved -> message.setText("Search saved. New matching approvals can appear in Notifications."));
+                        }
+                    } catch (UserError error) { message.setText(error.getMessage()); }
+                });
+            }
             button(controls, "Clear", () -> browse("", null));
 
             var model = readOnly("Job", role == Role.COMPANY ? "Category" : "Company", "Status");
@@ -141,6 +181,7 @@ public final class JobsPanel extends JPanel {
             if (role == Role.COMPANY) {
                 button(actions, "Create job", () -> editor(null));
                 actions.add(attach);
+                button(actions, "Download circular template (.docx)", this::downloadCircularTemplate);
             }
             if (role == Role.ADMIN) {
                 button(actions, "Verify companies", this::companies);
@@ -170,6 +211,7 @@ public final class JobsPanel extends JPanel {
                 + "\n" + d.location() + " · Salary " + d.salaryMin() + "–" + d.salaryMax()
                 + "\nStatus  ·  " + WorkspaceStyle.label(job.status())
                 + "\nUnfilled vacancies  ·  " + job.remainingVacancies() + " of " + d.vacancyCount()
+                + (d.deadline() == null ? "" : "\nApplication deadline  ·  " + d.deadline())
                 + (job.decision() == null || job.decision().isBlank() ? "" : "\n" + job.decision()) + "\n\n" + d.description();
         tabs.addTab("Posting", WorkspaceStyle.text(summary));
         tabs.addTab("Requirements", WorkspaceStyle.table(new JTable(requirementModel(d.requirements(), false))));
@@ -181,6 +223,9 @@ public final class JobsPanel extends JPanel {
             if (job.status() != Status.CLOSED) {
                 button(circularControls, "Attach / replace circular", () -> attachCircular(job));
             } else { circularControls.add(new JLabel("This job is closed. Its circular cannot be changed.")); }
+        }
+        if (role == Role.COMPANY) {
+            button(circularControls, "Download circular template (.docx)", this::downloadCircularTemplate);
         }
         button(circularControls, "View circular", () -> work(() -> service.circular(session, job.id()), circular -> {
             if (circular.isEmpty()) { message.setText("This job has no circular attachment."); return; }
@@ -258,6 +303,9 @@ public final class JobsPanel extends JPanel {
         JTextField min = new JTextField(d == null ? "0" : d.salaryMin().toPlainString());
         JTextField max = new JTextField(d == null ? "0" : d.salaryMax().toPlainString());
         JTextField vacancies = new JTextField(d == null ? "1" : Integer.toString(d.vacancyCount()));
+        Deadline closing = d == null ? null : d.deadline();
+        JTextField deadline = new JTextField(closing == null ? "" : closing.time().atZone(closing.zone()).toLocalDateTime().toString());
+        JTextField zone = new JTextField(closing == null ? ZoneId.systemDefault().getId() : closing.zone().getId());
         field(posting, "Title", title);
         field(posting, "Description", new JScrollPane(description));
         field(posting, "Category", category);
@@ -265,6 +313,8 @@ public final class JobsPanel extends JPanel {
         field(posting, "Salary minimum", min);
         field(posting, "Salary maximum", max);
         field(posting, "Number of vacancies", vacancies);
+        field(posting, "Deadline (optional, YYYY-MM-DD HH:mm)", deadline);
+        field(posting, "Deadline time zone (e.g. Asia/Dhaka)", zone);
         var guidance = WorkspaceStyle.message("Use months for experience and add an experience tag for a positive minimum. "
                 + "Degree order is Secondary, Diploma, Bachelor, Master, Doctorate. The Mandatory checkbox controls eligibility.");
         requirements.add(guidance, BorderLayout.NORTH);
@@ -309,13 +359,16 @@ public final class JobsPanel extends JPanel {
                 }
                 Details input = new Details(title.getText(), description.getText(), ((Category) category.getSelectedItem()).id(), location.getText(),
                         new BigDecimal(min.getText().strip()), new BigDecimal(max.getText().strip()), items,
-                        Integer.parseInt(vacancies.getText().strip()));
+                        Integer.parseInt(vacancies.getText().strip()), deadline.getText().isBlank() ? null
+                                : Deadline.of(LocalDateTime.parse(deadline.getText().strip().replace(' ', 'T')), ZoneId.of(zone.getText().strip())));
                 work(() -> service.submit(session, job == null ? 0 : job.id(), input), ignored -> browse("", null));
             } catch (NumberFormatException exception) { message.setText("Enter numeric salary values and whole numbers for months and vacancies."); }
+            catch (java.time.DateTimeException exception) { message.setText("Enter a deadline as YYYY-MM-DD HH:mm and a valid time zone."); }
             catch (UserError exception) { message.setText(exception.getMessage()); }
         });
         WorkspaceStyle.primary(submit);
         actions.add(submit);
+        button(actions, "Download circular template (.docx)", this::downloadCircularTemplate);
         button(actions, "Cancel", () -> browse("", null));
         var tabs = new JTabbedPane();
         tabs.addTab("Posting information", WorkspaceStyle.scroll(posting));
@@ -326,6 +379,10 @@ public final class JobsPanel extends JPanel {
         body.add(actions, BorderLayout.SOUTH);
         refresh();
         message.setText("Saving returns the entire job to pending approval. Add at least one scored requirement.");
+    }
+
+    private void downloadCircularTemplate() {
+        FileSaveDialog.template(this, FileSaveDialog.CIRCULAR, message::setText);
     }
 
     private void companies() {

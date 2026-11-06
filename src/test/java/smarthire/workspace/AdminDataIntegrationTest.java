@@ -34,6 +34,7 @@ class AdminDataIntegrationTest {
         var cv = fixture.confirm(fixture.student, List.of(fixture.skill));
         long job = fixture.publish();
         var application = fixture.applications.apply(fixture.student, job);
+        fixture.applications.transition(fixture.company, application.id(), Application.Status.SHORTLISTED);
         long student = fixture.identity.profile(fixture.student).id();
         var target = new Target(Kind.STUDENT, Long.toString(student));
         var file = root.resolve("student.zip");
@@ -43,6 +44,7 @@ class AdminDataIntegrationTest {
         try (var zip = new ZipFile(file.toFile())) {
             assertFalse(text(zip, "account.txt").contains("password_hash"));
             assertTrue(text(zip, "applications.txt").contains(application.id().toString()));
+            assertTrue(text(zip, "application_status_events.txt").contains("SHORTLISTED"));
             assertTrue(text(zip, "application_notices.txt").contains(application.id().toString()));
             assertTrue(text(zip, "cv_approvals.txt").contains("APPROVED"));
             assertArrayEquals(Files.readAllBytes(fixture.pdf), zip.getInputStream(zip.getEntry("originals/" + cv.documentId() + ".pdf")).readAllBytes());

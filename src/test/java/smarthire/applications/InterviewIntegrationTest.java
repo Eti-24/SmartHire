@@ -42,6 +42,8 @@ class InterviewIntegrationTest {
             service.changeInterview(f.company, id, 0, PROPOSE, slot);
             assertThrows(UserError.class, () -> service.interview(f.secondStudent, id));
             service.changeInterview(f.student, id, 1, ACCEPT, null);
+            assertEquals(slot, service.interview(f.student, id).current().slot());
+            assertEquals(Interview.Status.CONFIRMED, service.interview(f.company, id).current().status());
             service.changeInterview(f.student, id, 2, RESCHEDULE, null);
             var replacement = service.changeInterview(f.company, id, 3, PROPOSE, slot(120));
             assertThrows(UserError.class, () -> service.changeInterview(f.student, id, 1, ACCEPT, null));
@@ -51,6 +53,7 @@ class InterviewIntegrationTest {
             var admin = new WorkspaceService(f.identity, new JdbcWorkspace(f.database), f.documents);
             admin.setActive(f.admin, f.identity.profile(f.student).id(), false);
             assertEquals(Interview.Status.CANCELLED, service.interview(f.company, id).current().status());
+            assertEquals(slot(120), service.interview(f.company, id).current().slot());
             assertThrows(UserError.class, () -> service.interviews(f.student));
             var target = new AdminData.Target(AdminData.Kind.CV, cv.id().toString());
             var impact = admin.eraseImpact(f.admin, target);

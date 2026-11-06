@@ -3,6 +3,10 @@ package smarthire.storage;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -11,6 +15,8 @@ import java.util.function.Function;
 import smarthire.identity.UserError;
 import smarthire.jobs.Job;
 import smarthire.jobs.JobRepository;
+import smarthire.jobs.JobSearch;
+import smarthire.jobs.SavedSearch;
 import smarthire.jobs.JobService.SavedJob;
 import smarthire.jobs.JobService.SavedStatus;
 import smarthire.skills.Skill;
@@ -21,6 +27,8 @@ import static smarthire.jobs.Job.*;
 public final class JdbcJobs implements JobRepository {
     static final String HIRED_COUNT = "(SELECT COUNT(*) FROM applications a WHERE a.job_id=j.id AND a.status='HIRED')";
     static final String FILLED_JOB = "(" + HIRED_COUNT + ">=j.vacancy_count)";
+    static final String OPEN_AT = "j.status='APPROVED' AND c.verified=TRUE AND u.active=TRUE AND NOT "
+            + FILLED_JOB + " AND (j.application_deadline_at IS NULL OR j.application_deadline_at>?)";
     private static final String POSTINGS = "SELECT j.*,u.display_name," + HIRED_COUNT + " AS hired_count"
             + " FROM jobs j JOIN users u ON u.id=j.company_id";
     private final Database database;
@@ -127,23 +135,110 @@ public final class JdbcJobs implements JobRepository {
         }
 
         @Override public List<Job> jobs() {
-            return queryJobs(POSTINGS + " ORDER BY j.id", null);
+            return queryJobs(POSTINGS + " ORDER BY j.id", List.of());
         }
 
-        @Override public List<Job> unfilledJobs() {
-            return queryJobs(POSTINGS + " WHERE NOT "
-                    + FILLED_JOB + " ORDER BY j.id", null);
+        @Override public List<Job> search(JobSearch criteria, Long companyId, Instant availableAt) {
+            return search(criteria, companyId, availableAt, null);
         }
 
-        @Override public List<SavedJob> savedJobs(long studentId) {
+        private List<Job> search(JobSearch criteria, Long companyId, Instant availableAt, Long jobId) {
+            var sql = new StringBuilder(POSTINGS).append(" JOIN companies c ON c.user_id=j.company_id WHERE TRUE");
+            var values = new ArrayList<Object>();
+            if (availableAt != null) { filter(sql, values, OPEN_AT, utc(availableAt)); }
+            filter(sql, values, "j.id=?", jobId);
+            filter(sql, values, "j.company_id=?", companyId);
+            filter(sql, values, "LOCATE(CAST(? AS BINARY),CAST(LOWER(j.title) AS BINARY))>0",
+                    criteria.title().isEmpty() ? null : criteria.title());
+            filter(sql, values, "j.category_id=?", criteria.categoryId());
+            filter(sql, values, "LOCATE(CAST(? AS BINARY),CAST(LOWER(j.location) AS BINARY))>0",
+                    criteria.location().isEmpty() ? null : criteria.location());
+            filter(sql, values, "j.salary_max>=?", criteria.minimumSalary());
+            filter(sql, values, "j.salary_min<=?", criteria.maximumSalary());
+            filter(sql, values, "j.application_deadline_at>=?", utc(criteria.closingFrom()));
+            filter(sql, values, "j.application_deadline_at<?", utc(criteria.closingBefore()));
+            return queryJobs(sql.append(" ORDER BY j.id").toString(), values);
+        }
+
+        @Override public List<SavedSearch> savedSearches(long studentId) {
+            try (var query = connection.prepareStatement("SELECT * FROM saved_job_searches WHERE student_id=? ORDER BY id")) {
+                query.setLong(1, studentId);
+                try (var rows = query.executeQuery()) {
+                    var result = new ArrayList<SavedSearch>();
+                    while (rows.next()) {
+                        result.add(new SavedSearch(rows.getLong("id"), rows.getString("name"), searchCriteria(rows), rows.getBoolean("active")));
+                    }
+                    return List.copyOf(result);
+                }
+            } catch (SQLException exception) { throw failure(exception); }
+        }
+
+        @Override public void saveSearch(long studentId, SavedSearch search) {
+            var criteria = search.criteria();
+            String columns = "name=?,title=?,category_id=?,location=?,minimum_salary=?,maximum_salary=?,closing_from=?,closing_before=?,active=?";
+            if (search.id() == 0) {
+                update("INSERT INTO saved_job_searches SET " + columns + ",student_id=?",
+                        search.name(), criteria.title(), criteria.categoryId(), criteria.location(), criteria.minimumSalary(),
+                        criteria.maximumSalary(), utc(criteria.closingFrom()), utc(criteria.closingBefore()), search.active(), studentId);
+            } else {
+                if (savedSearches(studentId).stream().noneMatch(row -> row.id() == search.id())) {
+                    throw new UserError("Saved search not found.");
+                }
+                update("UPDATE saved_job_searches SET " + columns + " WHERE student_id=? AND id=?",
+                        search.name(), criteria.title(), criteria.categoryId(), criteria.location(), criteria.minimumSalary(),
+                        criteria.maximumSalary(), utc(criteria.closingFrom()), utc(criteria.closingBefore()), search.active(), studentId, search.id());
+            }
+        }
+
+        @Override public void deleteSearch(long studentId, long searchId) {
+            update("DELETE FROM saved_job_searches WHERE student_id=? AND id=?", studentId, searchId);
+        }
+
+        @Override public void notifySavedSearches(long jobId, Instant now) {
+            String sql = "SELECT s.* FROM saved_job_searches s JOIN users u ON u.id=s.student_id"
+                    + " WHERE s.active=TRUE AND u.active=TRUE AND NOT EXISTS (SELECT 1 FROM saved_search_notices n"
+                    + " WHERE n.student_id=s.student_id AND n.job_id=?) ORDER BY s.student_id,s.id";
+            try (var query = connection.prepareStatement(sql)) {
+                query.setLong(1, jobId);
+                try (var rows = query.executeQuery()) {
+                    var notified = new HashSet<Long>();
+                    while (rows.next()) {
+                        long student = rows.getLong("student_id");
+                        if (notified.contains(student) || search(searchCriteria(rows), null, now, jobId).isEmpty()) { continue; }
+                        var notice = JdbcNotifications.add(connection, student, "A posting matched one of your saved searches.");
+                        update("INSERT INTO saved_search_notices(notice_id,student_id,job_id) VALUES (?,?,?)",
+                                notice.toString(), student, jobId);
+                        notified.add(student);
+                    }
+                }
+            } catch (SQLException exception) { throw failure(exception); }
+        }
+
+        private static JobSearch searchCriteria(java.sql.ResultSet row) throws SQLException {
+            var from = row.getObject("closing_from", LocalDateTime.class);
+            var before = row.getObject("closing_before", LocalDateTime.class);
+            return new JobSearch(row.getString("title"), row.getObject("category_id", Long.class), row.getString("location"),
+                    row.getBigDecimal("minimum_salary"), row.getBigDecimal("maximum_salary"),
+                    from == null ? null : from.toInstant(ZoneOffset.UTC), before == null ? null : before.toInstant(ZoneOffset.UTC));
+        }
+
+        private static void filter(StringBuilder sql, List<Object> values, String predicate, Object value) {
+            if (value != null) {
+                sql.append(" AND ").append(predicate);
+                values.add(value);
+            }
+        }
+
+        @Override public List<SavedJob> savedJobs(long studentId, Instant now) {
             String sql = "SELECT j.id,j.title,b.saved_title,j.status,u.active,c.verified," + FILLED_JOB
-                    + ",a.id FROM saved_jobs b JOIN jobs j ON j.id=b.job_id JOIN users u ON u.id=j.company_id"
+                    + ",a.id,j.application_deadline_at<=? FROM saved_jobs b JOIN jobs j ON j.id=b.job_id JOIN users u ON u.id=j.company_id"
                     + " JOIN companies c ON c.user_id=j.company_id"
                     + " LEFT JOIN applications a ON a.student_id=b.student_id AND a.job_id=b.job_id"
                     + " WHERE b.student_id=? ORDER BY b.saved_at DESC,j.id DESC";
             var result = new ArrayList<SavedJob>();
             try (var query = connection.prepareStatement(sql)) {
-                query.setLong(1, studentId);
+                query.setObject(1, utc(now));
+                query.setLong(2, studentId);
                 try (var rows = query.executeQuery()) {
                     while (rows.next()) {
                         Status status = Status.valueOf(rows.getString(4));
@@ -151,10 +246,10 @@ public final class JdbcJobs implements JobRepository {
                         if (!rows.getBoolean(5) || !rows.getBoolean(6)) { availability = SavedStatus.UNAVAILABLE; }
                         else if (rows.getBoolean(7)) { availability = SavedStatus.FILLED; }
                         else if (status == Status.CLOSED) { availability = SavedStatus.CLOSED; }
-                        else if (status == Status.APPROVED) { availability = SavedStatus.AVAILABLE; }
+                        else if (status == Status.APPROVED) { availability = rows.getBoolean(9) ? SavedStatus.DEADLINE_PASSED : SavedStatus.AVAILABLE; }
                         else { availability = SavedStatus.UNAVAILABLE; }
                         String title = switch (availability) {
-                            case AVAILABLE -> rows.getString(2);
+                            case AVAILABLE, DEADLINE_PASSED -> rows.getString(2);
                             case CLOSED, FILLED -> rows.getString(3);
                             case UNAVAILABLE -> "Unavailable posting";
                         };
@@ -194,7 +289,7 @@ public final class JdbcJobs implements JobRepository {
         }
 
         @Override public Optional<Job> lockJob(long id) {
-            return queryJobs(POSTINGS + " WHERE j.id=? FOR UPDATE", id).stream().findFirst();
+            return queryJobs(POSTINGS + " WHERE j.id=? FOR UPDATE", List.of(id)).stream().findFirst();
         }
 
         @Override public boolean hasApplications(long jobId) {
@@ -256,10 +351,10 @@ public final class JdbcJobs implements JobRepository {
             update("INSERT INTO job_circulars(job_id,document_id) VALUES (?,?) ON DUPLICATE KEY UPDATE document_id=?", jobId, document.id().toString(), document.id().toString());
         }
 
-        private List<Job> queryJobs(String sql, Long id) {
+        private List<Job> queryJobs(String sql, List<Object> parameters) {
             var result = new ArrayList<Job>();
             try (var statement = connection.prepareStatement(sql)) {
-                if (id != null) { statement.setLong(1, id); }
+                for (int i = 0; i < parameters.size(); i++) { statement.setObject(i + 1, parameters.get(i)); }
                 try (var rows = statement.executeQuery()) {
                     while (rows.next()) {
                         long jobId = rows.getLong("id");
@@ -271,10 +366,13 @@ public final class JdbcJobs implements JobRepository {
                                         items.getInt("months"), Priority.valueOf(items.getString("priority")), items.getBoolean("mandatory"))); }
                             }
                         }
+                        var time = rows.getObject("application_deadline_at", LocalDateTime.class);
+                        var deadline = time == null ? null : new Deadline(time.toInstant(ZoneOffset.UTC),
+                                ZoneId.of(rows.getString("application_deadline_zone")));
                         result.add(new Job(jobId, rows.getLong("company_id"), rows.getString("display_name"),
                                 new Details(rows.getString("title"), rows.getString("description"), rows.getLong("category_id"),
                                         rows.getString("location"), rows.getBigDecimal("salary_min"), rows.getBigDecimal("salary_max"),
-                                        requirements, rows.getInt("vacancy_count")),
+                                        requirements, rows.getInt("vacancy_count"), deadline),
                                 Status.valueOf(rows.getString("status")), rows.getString("decision"), rows.getLong("hired_count")));
                     }
                 }
@@ -283,17 +381,22 @@ public final class JdbcJobs implements JobRepository {
         }
 
         @Override public long saveJob(long companyId, long id, Details details) {
+            var deadline = details.deadline();
+            LocalDateTime time = deadline == null ? null : utc(deadline.time());
+            String zone = deadline == null ? null : deadline.zone().getId();
             if (id == 0) {
-                try (var statement = connection.prepareStatement("INSERT INTO jobs(company_id,title,description,category_id,location,salary_min,salary_max,vacancy_count) VALUES (?,?,?,?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS)) {
+                try (var statement = connection.prepareStatement("INSERT INTO jobs(company_id,title,description,category_id,location,salary_min,salary_max,vacancy_count,application_deadline_at,application_deadline_zone) VALUES (?,?,?,?,?,?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS)) {
                     statement.setLong(1, companyId); statement.setString(2, details.title()); statement.setString(3, details.description());
                     statement.setLong(4, details.categoryId()); statement.setString(5, details.location());
                     statement.setBigDecimal(6, details.salaryMin()); statement.setBigDecimal(7, details.salaryMax());
-                    statement.setInt(8, details.vacancyCount()); statement.executeUpdate();
+                    statement.setInt(8, details.vacancyCount());
+                    statement.setObject(9, time); statement.setString(10, zone);
+                    statement.executeUpdate();
                     try (var keys = statement.getGeneratedKeys()) { keys.next(); id = keys.getLong(1); }
                 } catch (SQLException exception) { throw failure(exception); }
             } else {
-                update("UPDATE jobs SET title=?,description=?,category_id=?,location=?,salary_min=?,salary_max=?,vacancy_count=?,status='PENDING',decision='' WHERE id=?",
-                        details.title(), details.description(), details.categoryId(), details.location(), details.salaryMin(), details.salaryMax(), details.vacancyCount(), id);
+                update("UPDATE jobs SET title=?,description=?,category_id=?,location=?,salary_min=?,salary_max=?,vacancy_count=?,application_deadline_at=?,application_deadline_zone=?,status='PENDING',decision='' WHERE id=?",
+                        details.title(), details.description(), details.categoryId(), details.location(), details.salaryMin(), details.salaryMax(), details.vacancyCount(), time, zone, id);
                 update("DELETE FROM job_requirements WHERE job_id=?", id);
             }
             int ordinal = 0;
@@ -302,6 +405,10 @@ public final class JdbcJobs implements JobRepository {
                         id, ordinal++, r.kind().name(), r.value(), r.months(), r.priority().name(), r.mandatory());
             }
             return id;
+        }
+
+        private static LocalDateTime utc(Instant time) {
+            return time == null ? null : LocalDateTime.ofInstant(time.truncatedTo(java.time.temporal.ChronoUnit.MICROS), ZoneOffset.UTC);
         }
 
         @Override public void status(long id, Status status, String decision) {

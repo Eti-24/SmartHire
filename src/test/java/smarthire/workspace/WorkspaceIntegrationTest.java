@@ -58,9 +58,12 @@ class WorkspaceIntegrationTest {
         long job = f.publish(); f.confirm(f.student, List.of(f.skill)); var a = f.applications.apply(f.student, job);
         int studentBefore = workspace.notices(f.student).size(), companyBefore = workspace.notices(f.company).size();
         assertThrows(IllegalStateException.class, () -> new JdbcApplications(f.database).transaction(store -> {
-            store.status(a.id(), Application.Status.SHORTLISTED); throw new IllegalStateException("Injected failure after event write");
+            store.lock(a.id()).orElseThrow();
+            store.status(a, Application.Status.SHORTLISTED, smarthire.identity.Role.COMPANY, java.time.Instant.now());
+            throw new IllegalStateException("Injected failure after event write");
         }));
         assertEquals(Application.Status.APPLIED, f.applications.open(f.student, a.id()).application().status());
+        assertEquals(1, f.applications.timeline(f.student, a.id()).events().size());
         assertThrows(UserError.class, () -> f.applications.apply(f.student, job));
         assertThrows(UserError.class, () -> f.applications.transition(f.company, a.id(), Application.Status.HIRED));
         assertEquals(studentBefore, workspace.notices(f.student).size()); assertEquals(companyBefore, workspace.notices(f.company).size());

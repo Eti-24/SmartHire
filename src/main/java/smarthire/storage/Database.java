@@ -10,6 +10,7 @@ import java.util.Properties;
 import smarthire.identity.UserError;
 
 public final class Database {
+    private static final int SCHEMA_VERSION = 5;
     private final String url;
     private final Properties credentials;
 
@@ -72,6 +73,37 @@ public final class Database {
     }
 
     public void initialize() {
+        if (isCloud()) {
+            if (!Boolean.getBoolean("smarthire.requireCloud")) {
+                throw new UserError("This launch is for local MySQL. Use the SmartHire cloud launcher to connect to Aiven.");
+            }
+            verifyCloudSchema();
+            return;
+        }
+        applySchema();
+    }
+
+    public void upgradeCloudSchema() {
+        if (!isCloud() || !Boolean.getBoolean("smarthire.requireCloud")) {
+            throw new UserError("Use the SmartHire cloud launcher to upgrade Aiven.");
+        }
+        applySchema();
+    }
+
+    private void verifyCloudSchema() {
+        try (var connection = connect(); var query = connection.prepareStatement(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version BETWEEN 1 AND ?")) {
+            query.setInt(1, SCHEMA_VERSION);
+            try (var result = query.executeQuery()) {
+                if (result.next() && result.getInt(1) == SCHEMA_VERSION) { return; }
+            }
+        } catch (SQLException exception) {
+            if (!"42S02".equals(exception.getSQLState())) { throw unavailable(); }
+        }
+        throw new UserError("The cloud schema needs an upgrade. Run SmartHire-Cloud.cmd --upgrade-database before signing in.");
+    }
+
+    private void applySchema() {
         try (var input = Database.class.getResourceAsStream("/db/schema.sql")) {
             if (input == null) {
                 throw new IllegalStateException("Packaged schema is missing.");
@@ -87,11 +119,42 @@ public final class Database {
                     }
                 }
                 migrateVacancies(connection);
+                applyMigration(connection, 2, "/db/migration-02-application-timeline.sql");
+                if (!hasColumn(connection, "jobs", "application_deadline_at")) {
+                    statement.execute("ALTER TABLE jobs ADD COLUMN application_deadline_at DATETIME(6) NULL,"
+                            + " ADD COLUMN application_deadline_zone VARCHAR(80) NULL,"
+                            + " ADD CONSTRAINT job_deadline_has_zone CHECK ((application_deadline_at IS NULL) = (application_deadline_zone IS NULL))");
+                }
+                statement.executeUpdate("INSERT IGNORE INTO schema_migrations(version) VALUES (3)");
+                applyMigration(connection, 4, "/db/migration-04-saved-searches.sql");
+                if (!hasColumn(connection, "users", "credential_version")) {
+                    statement.execute("ALTER TABLE users ADD COLUMN credential_version BIGINT NOT NULL DEFAULT 1");
+                }
+                applyMigration(connection, 5, "/db/migration-05-recovery-codes.sql");
             }
         } catch (SQLException exception) {
             throw unavailable();
         } catch (IOException exception) {
             throw new UserError("Could not read the packaged database schema. Rebuild the application.");
+        }
+    }
+
+    private static void applyMigration(Connection connection, int version, String resource) throws SQLException, IOException {
+        try (var check = connection.prepareStatement("SELECT version FROM schema_migrations WHERE version=?")) {
+            check.setInt(1, version);
+            try (var applied = check.executeQuery()) {
+                if (applied.next()) { return; }
+            }
+        }
+        try (var input = Database.class.getResourceAsStream(resource); var ddl = connection.createStatement();
+                var mark = connection.prepareStatement("INSERT INTO schema_migrations(version) VALUES (?)")) {
+            if (input == null) { throw new IOException("Migration resource missing."); }
+            var sql = new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            for (String command : sql.split(";")) {
+                if (!command.isBlank()) { ddl.execute(command); }
+            }
+            mark.setInt(1, version);
+            mark.executeUpdate();
         }
     }
 

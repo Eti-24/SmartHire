@@ -1,5 +1,8 @@
-param([switch]$SeedDemo, [switch]$Cloud, [switch]$BuildOnly)
+param([switch]$SeedDemo, [switch]$Cloud, [switch]$BuildOnly, [switch]$UpgradeDatabase)
 $ErrorActionPreference = 'Stop'
+if ($UpgradeDatabase -and (!$Cloud -or $SeedDemo -or $BuildOnly)) {
+    throw 'Use -Cloud -UpgradeDatabase by itself to prepare the cloud database.'
+}
 . (Join-Path $PSScriptRoot 'dev-env.ps1')
 $smartHireProject = Split-Path $PSScriptRoot -Parent
 Push-Location $smartHireProject
@@ -20,7 +23,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     if ($BuildOnly) { return }
     $smartHireRuntime = (Get-Content target/runtime-classpath.txt -Raw).Trim()
-    if ($SeedDemo) {
+    if ($UpgradeDatabase) {
+        & java @smartHireJavaOptions -cp "target/classes;$smartHireRuntime" smarthire.Main --upgrade-database
+    } elseif ($SeedDemo) {
         & java @smartHireJavaOptions -cp "target/classes;$smartHireRuntime" smarthire.Main --seed-demo
     } else {
         & java @smartHireJavaOptions -cp "target/classes;$smartHireRuntime" smarthire.Main

@@ -4,6 +4,8 @@ Install the [Java 21 JDK](https://adoptium.net/temurin/releases/?version=21) and
 
 ## Connect to Aiven
 
+The cloud Windows ZIP contains `SmartHire-Cloud.cmd` and the Aiven configuration example. The local ZIP contains `SmartHire.cmd`.
+
 If you already run SmartHire from source with Aiven, copy `aiven.properties` and `aiven-truststore.p12` from the checkout's `.local` folder to the ZIP's `.local` folder and go to step 4.
 
 1. Open your MySQL service in the Aiven Console. Copy the host, port, database name, username, and password from the connection details. Download the [project CA certificate](https://aiven.io/docs/platform/concepts/tls-ssl-certificates).
@@ -19,14 +21,16 @@ If you already run SmartHire from source with Aiven, copy `aiven.properties` and
 
    When `keytool` prompts you to trust the certificate, check that it matches the CA downloaded from Aiven and enter `yes`.
 3. Edit `.local/aiven.properties`. Fill in `jdbcUrl` as `jdbc:mysql://HOST:PORT/DATABASE` and put the username and password on their own lines. Keep this file private.
-4. Check the connection, then open SmartHire.
+4. Check the connection, then open SmartHire. For an existing installation, carry over the private `.local/aiven-documents` folder to retain access to originals.
 
    ```powershell
    .\SmartHire-Cloud.cmd --check-database
    .\SmartHire-Cloud.cmd
    ```
 
-SmartHire checks the server certificate and hostname. Uploaded CVs and circulars stay in `.local/aiven-documents` on this computer. Back up that folder with the cloud database. A second computer can connect to the same database, but needs a copy of that folder to open the original documents.
+When setting up a fresh Aiven database or upgrading an older SmartHire schema, close SmartHire clients and back up the database and document folder first. Run `.\SmartHire-Cloud.cmd --upgrade-database` once with a database account that can create and alter the schema. Use the updated launcher for subsequent sign-ins. The connection check verifies TLS connectivity and regular startup checks the schema version.
+
+SmartHire checks the server certificate and hostname. Uploaded CVs and circulars stay in `.local/aiven-documents` on this computer. A second computer can connect to the same database and needs access to the same original document files to open them.
 
 Use your cloud SmartHire sign-in. To seed a fresh Aiven database, create `.local/aiven-demo-accounts.properties` with separate `adminPassword` and `demoPassword` values, each at least 16 characters. Run `.\SmartHire-Cloud.cmd --seed-demo`. The admin uses `adminPassword`; fictional students and companies use `demoPassword`.
 

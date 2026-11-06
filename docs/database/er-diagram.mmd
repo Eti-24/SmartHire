@@ -32,6 +32,13 @@ erDiagram
     applications ||--o{ interview_notices : references
     cv_versions ||--o| cv_approvals : references
     users o|--o{ cv_approvals : references
+    applications ||--o{ application_status_events : references
+    students ||--o{ saved_job_searches : references
+    categories o|--o{ saved_job_searches : references
+    notifications ||--o| saved_search_notices : references
+    students ||--o{ saved_search_notices : references
+    jobs ||--o{ saved_search_notices : references
+    users ||--o{ account_recovery_codes : references
     schema_migrations {
         INT version PK
     }
@@ -39,6 +46,7 @@ erDiagram
         BIGINT id PK
         VARCHAR email
         VARCHAR password_hash
+        BIGINT credential_version
         ENUM role
         BOOLEAN active
         VARCHAR display_name
@@ -73,6 +81,8 @@ erDiagram
     jobs {
         BIGINT id PK
         INT vacancy_count
+        DATETIME application_deadline_at
+        VARCHAR application_deadline_zone
         BIGINT company_id FK
         VARCHAR title
         TEXT description
@@ -238,4 +248,36 @@ erDiagram
         VARCHAR reason
         BIGINT reviewer_id FK
         TIMESTAMP decided_at
+    }
+    application_status_events {
+        CHAR application_id PK,FK
+        INT sequence_no PK
+        ENUM previous_status
+        ENUM new_status
+        ENUM actor_role
+        DATETIME changed_utc
+    }
+    saved_job_searches {
+        BIGINT id PK
+        BIGINT student_id FK
+        VARCHAR name
+        VARCHAR title
+        BIGINT category_id FK
+        VARCHAR location
+        DECIMAL minimum_salary
+        DECIMAL maximum_salary
+        DATETIME closing_from
+        DATETIME closing_before
+        BOOLEAN active
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    saved_search_notices {
+        CHAR notice_id PK,FK
+        BIGINT student_id FK
+        BIGINT job_id FK
+    }
+    account_recovery_codes {
+        BIGINT user_id PK,FK
+        BINARY code_hash PK
     }

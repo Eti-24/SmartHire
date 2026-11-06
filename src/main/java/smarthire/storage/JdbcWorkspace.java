@@ -2,6 +2,8 @@ package smarthire.storage;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.*;
 import java.util.function.Function;
 import smarthire.identity.*;
@@ -9,6 +11,7 @@ import smarthire.applications.Application;
 import smarthire.workspace.WorkspaceRepository;
 import smarthire.workspace.AdminData;
 import smarthire.workspace.AdminActivity;
+import smarthire.workspace.RecruitmentReport;
 import static smarthire.workspace.WorkspaceRepository.*;
 
 public final class JdbcWorkspace implements WorkspaceRepository {
@@ -35,18 +38,29 @@ public final class JdbcWorkspace implements WorkspaceRepository {
                 }
             } catch (SQLException e) { throw Database.unavailable(); }
         }
-        @Override public List<Notice> notices(long userId) {
-            try (var query = connection.prepareStatement("SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC,id DESC")) {
-                query.setLong(1, userId); var result = new ArrayList<Notice>();
+        @Override public List<Notice> notices(long userId, Instant now) {
+            try (var query = connection.prepareStatement("SELECT n.*,CASE WHEN " + JdbcJobs.OPEN_AT
+                    + " THEN j.id END AS matched_job_id FROM notifications n"
+                    + " LEFT JOIN saved_search_notices s ON s.notice_id=n.id AND s.student_id=n.user_id"
+                    + " LEFT JOIN jobs j ON j.id=s.job_id LEFT JOIN companies c ON c.user_id=j.company_id"
+                    + " LEFT JOIN users u ON u.id=c.user_id"
+                    + " WHERE n.user_id=? ORDER BY n.created_at DESC,n.id DESC")) {
+                query.setObject(1, java.time.LocalDateTime.ofInstant(now.truncatedTo(java.time.temporal.ChronoUnit.MICROS), java.time.ZoneOffset.UTC));
+                query.setLong(2, userId);
+                var result = new ArrayList<Notice>();
                 try (var rows = query.executeQuery()) {
                     while (rows.next()) { var read = rows.getTimestamp("read_at");
-                        result.add(new Notice(UUID.fromString(rows.getString("id")), rows.getString("message"), rows.getTimestamp("created_at").toInstant(), read == null ? null : read.toInstant())); }
+                        result.add(new Notice(UUID.fromString(rows.getString("id")), rows.getString("message"),
+                                rows.getTimestamp("created_at").toInstant(), read == null ? null : read.toInstant(),
+                                rows.getObject("matched_job_id", Long.class))); }
                 } return List.copyOf(result);
             } catch (SQLException e) { throw Database.unavailable(); }
         }
         @Override public boolean markRead(long userId, UUID id) {
             // Read first so repeated marking succeeds independently of affected-row JDBC settings.
-            if (notices(userId).stream().noneMatch(n -> n.id().equals(id))) { return false; }
+            if (count("SELECT COUNT(*) FROM notifications WHERE id=? AND user_id=?", id.toString(), userId) == 0) {
+                return false;
+            }
             update("UPDATE notifications SET read_at=COALESCE(read_at,CURRENT_TIMESTAMP(6)) WHERE id=? AND user_id=?", id.toString(), userId); return true;
         }
         @Override public List<AccountSummary> accounts() {
@@ -85,7 +99,7 @@ public final class JdbcWorkspace implements WorkspaceRepository {
                 }
             } catch (SQLException e) { throw Database.unavailable(); }
         }
-        @Override public Dashboard dashboard(long id, Role role) {
+        @Override public Dashboard dashboard(long id, Role role, java.time.Instant now) {
             var counts = new LinkedHashMap<String, Long>();
             String appScope = switch (role) { case ADMIN -> ""; case STUDENT -> " WHERE a.student_id=" + id; case COMPANY -> " WHERE j.company_id=" + id; };
             String applications = " FROM applications a JOIN jobs j ON j.id=a.job_id" + appScope;
@@ -103,8 +117,8 @@ public final class JdbcWorkspace implements WorkspaceRepository {
                 counts.put("Pending jobs", count("SELECT COUNT(*) FROM jobs WHERE status='PENDING' AND company_id=" + id));
             } else {
                 counts.put("Available jobs", count("SELECT COUNT(*) FROM jobs j JOIN companies c ON c.user_id=j.company_id "
-                        + "JOIN users u ON u.id=c.user_id WHERE j.status='APPROVED' AND c.verified=TRUE AND u.active=TRUE AND NOT "
-                        + JdbcJobs.FILLED_JOB));
+                        + "JOIN users u ON u.id=c.user_id WHERE " + JdbcJobs.OPEN_AT,
+                        java.time.LocalDateTime.ofInstant(now.truncatedTo(java.time.temporal.ChronoUnit.MICROS), java.time.ZoneOffset.UTC)));
                 counts.put("Reviewed CV versions", count("SELECT COUNT(*) FROM cv_versions WHERE student_id=" + id));
             }
             var statuses = new LinkedHashMap<String, Long>();
@@ -114,8 +128,60 @@ public final class JdbcWorkspace implements WorkspaceRepository {
             } catch (SQLException e) { throw Database.unavailable(); }
             return new Dashboard(counts, statuses);
         }
-        private long count(String sql) {
-            try (var query = connection.prepareStatement(sql); var row = query.executeQuery()) { row.next(); return row.getLong(1); }
+
+        @Override public RecruitmentReport recruitmentReport(Long companyId, RecruitmentReport.Filter filter) {
+            var scope = new StringBuilder(" WHERE TRUE");
+            var parameters = new ArrayList<Long>();
+            addReportScope(scope, parameters, "j.company_id", companyId);
+            addReportScope(scope, parameters, "j.id", filter.jobId());
+            addReportScope(scope, parameters, "j.category_id", filter.categoryId());
+            String cohort = """
+                    SELECT COUNT(*) AS submissions, COALESCE(SUM(a.status='HIRED'),0) AS hired,
+                           COUNT(first_shortlist.elapsed) AS shortlist_samples, AVG(first_shortlist.elapsed) AS shortlist_seconds,
+                           COUNT(a.hired_at) AS hire_samples,
+                           AVG(UNIX_TIMESTAMP(a.hired_at)-UNIX_TIMESTAMP(a.submitted_at)) AS hire_seconds
+                    FROM applications a JOIN jobs j ON j.id=a.job_id
+                    LEFT JOIN LATERAL (
+                        SELECT TIMESTAMPDIFF(MICROSECOND,'1970-01-01',e.changed_utc)/1000000.0
+                            - UNIX_TIMESTAMP(a.submitted_at) AS elapsed
+                        FROM application_status_events e
+                        WHERE e.application_id=a.id AND e.new_status='SHORTLISTED'
+                        ORDER BY e.sequence_no LIMIT 1
+                    ) first_shortlist ON TRUE
+                    """ + scope + " AND UNIX_TIMESTAMP(a.submitted_at)>=? AND UNIX_TIMESTAMP(a.submitted_at)<?";
+            String capacity = "SELECT COALESCE(SUM(j.vacancy_count),0),COALESCE(SUM(" + JdbcJobs.HIRED_COUNT + "),0) FROM jobs j" + scope;
+            try (var applications = connection.prepareStatement(cohort); var jobs = connection.prepareStatement(capacity)) {
+                for (int i = 0; i < parameters.size(); i++) {
+                    applications.setLong(i + 1, parameters.get(i));
+                    jobs.setLong(i + 1, parameters.get(i));
+                }
+                applications.setBigDecimal(parameters.size() + 1, epochSeconds(filter.from()));
+                applications.setBigDecimal(parameters.size() + 2, epochSeconds(filter.until()));
+                try (var results = applications.executeQuery(); var totals = jobs.executeQuery()) {
+                    results.next();
+                    totals.next();
+                    return new RecruitmentReport(results.getLong("submissions"), results.getLong("hired"),
+                            results.getLong("shortlist_samples"), results.getBigDecimal("shortlist_seconds"),
+                            results.getLong("hire_samples"), results.getBigDecimal("hire_seconds"), totals.getLong(1), totals.getLong(2));
+                }
+            } catch (SQLException e) { throw Database.unavailable(); }
+        }
+
+        private static void addReportScope(StringBuilder sql, List<Long> parameters, String column, Long value) {
+            if (value != null) {
+                sql.append(" AND ").append(column).append("=?");
+                parameters.add(value);
+            }
+        }
+
+        private static BigDecimal epochSeconds(Instant value) {
+            return BigDecimal.valueOf(value.getEpochSecond()).add(BigDecimal.valueOf(value.getNano(), 9));
+        }
+        private long count(String sql, Object... parameters) {
+            try (var query = connection.prepareStatement(sql)) {
+                for (int i = 0; i < parameters.length; i++) { query.setObject(i + 1, parameters[i]); }
+                try (var row = query.executeQuery()) { row.next(); return row.getLong(1); }
+            }
             catch (SQLException e) { throw Database.unavailable(); }
         }
         private void update(String sql, Object... values) {

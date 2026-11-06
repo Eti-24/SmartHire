@@ -1,5 +1,23 @@
 # Implementation status
 
+## Local roadmap slices 14–20
+
+The local Swing build includes slices 14–17 and 19–20 of the [local roadmap](local-feature-roadmap.md).
+
+- **14. Word templates.** My CV and the company job editor and circular controls offer editable DOCX downloads. Save As copies the bundled file. Uploading an edited copy follows the existing CV or circular review flow.
+- **15. Application timeline.** Students and recruiters see submission, recorded status changes and interview revisions. Historical status stays visible when its transition date is unknown. The admin archive includes scoped status events.
+- **16. Deadlines and search.** Companies can set an optional closing time and time zone. The cutoff excludes expired postings from discovery and new applications while recruiters retain access to existing applications. Find jobs supports location, salary overlap and closing-date filters.
+- **17. Saved searches.** Students can run, edit, pause or remove saved criteria. A matching approval can create one neutral inbox alert per student and posting. Opening the posting rechecks student access.
+- **18. Calendar export removed.** Participants schedule interviews and review their history in SmartHire.
+- **19. Reports.** Companies and admins can filter an application cohort and see conversion, average times based on recorded events, and current capacity. The first local release displays the report in Swing.
+- **20. Password and recovery.** Password changes and recovery invalidate older sessions. Issuing codes replaces the previous set. A successful reset consumes the full set. Recovery attempts are limited per sign-in service process, so restarting the local app restarts the limit. The database stores only code hashes, which are excluded from admin exports.
+
+`scripts/package-release.ps1` builds the local ZIP with `SmartHire.cmd`. The `-Cloud` switch builds a separate Aiven ZIP with `SmartHire-Cloud.cmd`. The cloud launcher checks the schema on normal startup and applies migrations only when run with `--upgrade-database`.
+
+The Aiven demo schema was upgraded from version 1 to 5 after a backup and an isolated Aiven rehearsal. The live migration preserved the counts of eight accounts, eight jobs, two applications and one managed document reference. Existing demo sign-ins, job browsing and recruiter and admin reports passed against the upgraded schema. The rehearsal verified saved-search writes and password recovery. Original document files remain in the launching computer's private cloud document folder.
+
+After calendar export was removed, all 44 unit checks and 66 local MySQL checks passed. The suite exercised fresh installation, upgrade from the previous schema, migration retries and preservation of a changed demo password during reseeding. The automated Swing walkthrough at 125% scaling used the original date and time form to propose an interview as the company and accept it as the student. It checked that the company Interview tab and the student Interviews page omit the export button. Earlier Swing checks covered both DOCX downloads, save cancellation, overwrite refusal, edited reuploads, the saved-search alert, timeline, reports and password change. Physical Windows input and visual rendering in Word still need a manual pass. See the [local roadmap walkthrough](demo-guide.md#local-roadmap-walkthrough).
+
 Implementation started on 2026-11-05. Slices 01, 02, 02a, 03, 04, 05, 05b and 06 are implemented. Interactive Swing acceptance remains pending.
 
 ## Slice 01: identity and navigation

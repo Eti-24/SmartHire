@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -37,7 +38,8 @@ public final class ApplicationService {
             Profile student = store.activeActor(actor.id(), Role.STUDENT);
             if (job.remainingVacancies() == 0) { throw new UserError("All vacancies for this posting have been filled."); }
             var company = store.jobs().companies().stream().filter(c -> c.id() == job.companyId()).findFirst().orElseThrow();
-            if (job.status() != Job.Status.APPROVED || !company.active() || !company.verified()) { throw new UserError("This job is no longer open for applications."); }
+            Instant admittedAt = clock.instant();
+            if (!job.accepting(company, admittedAt)) { throw new UserError("This job is no longer open for applications."); }
             if (store.list(student.id(), Role.STUDENT).stream().anyMatch(a -> a.jobId() == jobId)) { throw new UserError("You have already applied to this job."); }
             CvProfile cv = store.cvs(student.id()).current().orElseThrow(() -> new UserError("Confirm a CV review before applying."));
             var approval = store.cvs(student.id()).approval(cv.id());
@@ -47,7 +49,7 @@ public final class ApplicationService {
             documents.read(cv.documentId());
             MatchResult match = new MatchEngine().assess(cv.qualifications(), job.details(), store.cvs(student.id()).vocabulary(), store.jobs().activePolicy());
             if (!match.eligible()) { throw new UserError("You do not meet the mandatory requirements: " + String.join("; ", match.failedMandatory())); }
-            Application application = new Application(UUID.randomUUID(), student.id(), jobId, cv.id(), Instant.now(), Application.Status.APPLIED,
+            Application application = new Application(UUID.randomUUID(), student.id(), jobId, cv.id(), admittedAt, Application.Status.APPLIED,
                     student, match.policyVersion(), match.percentage(), explanation(match));
             store.insert(application); return application;
         });
@@ -96,12 +98,12 @@ public final class ApplicationService {
             if (target == Application.Status.HIRED && posting.remainingVacancies() == 0) {
                 throw new UserError("All vacancies for this posting have already been filled.");
             }
-            store.status(id, target);
+            Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
+            store.status(a, target, actor.role(), now);
             if (target == Application.Status.HIRED || target == Application.Status.REJECTED || target == Application.Status.WITHDRAWN) {
-                cancelInterview(store, a, posting, clock.instant(), "Application " + target.name().toLowerCase(Locale.ROOT));
+                cancelInterview(store, a, posting, now, "Application " + target.name().toLowerCase(Locale.ROOT));
             }
             if (target == Application.Status.HIRED && posting.remainingVacancies() == 1) {
-                Instant now = clock.instant();
                 for (Interview other : store.currentInterviews(null, null, a.jobId())) {
                     if (!other.applicationId().equals(id) && other.canCancel(now)) {
                         Application applicant = store.lock(other.applicationId()).orElseThrow();
@@ -111,6 +113,29 @@ public final class ApplicationService {
             }
             return null;
         });
+    }
+
+    public ApplicationTimeline timeline(UUID session, UUID id) {
+        Profile actor = participant(session);
+        return repository.transaction(store -> {
+            store.activeActor(actor.id(), actor.role());
+            Application a = owned(store, id, actor);
+            var events = new ArrayList<ApplicationTimeline.Event>();
+            events.add(new ApplicationTimeline.Event(a.submittedAt(), "Submitted"));
+            var decisions = store.statusEvents(id);
+            decisions.forEach(event -> events.add(new ApplicationTimeline.Event(event.time(), timelineLabel(event.label()))));
+            if (a.status() == Application.Status.HIRED && decisions.stream().noneMatch(e -> e.label().equals("HIRED"))) {
+                store.hiredAt(id).ifPresent(time -> events.add(new ApplicationTimeline.Event(time, "Hired")));
+            }
+            store.interviewHistory(id).reversed().forEach(interview -> events.add(
+                    new ApplicationTimeline.Event(interview.changedAt(), "Interview " + timelineLabel(interview.status().name()).toLowerCase(Locale.ROOT))));
+            events.sort(Comparator.comparing(ApplicationTimeline.Event::time));
+            return new ApplicationTimeline(a.status(), List.copyOf(events));
+        });
+    }
+
+    private static String timelineLabel(String value) {
+        return value.charAt(0) + value.substring(1).toLowerCase(Locale.ROOT).replace('_', ' ');
     }
 
     public record InterviewEntry(UUID applicationId, String job, String participant, boolean schedulingOpen, List<Interview> history) {

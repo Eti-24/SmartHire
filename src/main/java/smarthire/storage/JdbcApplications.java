@@ -3,6 +3,9 @@ package smarthire.storage;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +13,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import smarthire.applications.Application;
 import smarthire.applications.ApplicationRepository;
+import smarthire.applications.ApplicationTimeline;
 import smarthire.applications.Interview;
 import smarthire.applications.RecruiterFeedback;
 import smarthire.cv.CvRepository;
@@ -131,11 +135,38 @@ public final class JdbcApplications implements ApplicationRepository {
                     p.name(), p.email(), p.phone(), p.affiliation(), p.about(), a.originalPolicy(), a.originalScore(), a.originalExplanation());
             notifyParticipants(a, "Application submitted");
         }
-        @Override public void status(UUID id, Application.Status status) {
-            Application previous = lock(id).orElseThrow();
-            update("UPDATE applications SET status=?,hired_at=CASE WHEN ?='HIRED' THEN CURRENT_TIMESTAMP(6) ELSE hired_at END WHERE id=?",
-                    status.name(), status.name(), id.toString());
-            if (previous.status() != status) { notifyParticipants(previous, "Application " + status.name().toLowerCase(java.util.Locale.ROOT)); }
+        @Override public void status(Application previous, Application.Status status, Role actorRole, Instant time) {
+            String id = previous.id().toString();
+            update("UPDATE applications SET status=?,hired_at=CASE WHEN ?='HIRED' THEN ? ELSE hired_at END WHERE id=?",
+                    status.name(), status.name(), Timestamp.from(time), id);
+            update("INSERT INTO application_status_events(application_id,sequence_no,previous_status,new_status,actor_role,changed_utc)"
+                    + " SELECT ?,COALESCE(MAX(sequence_no),0)+1,?,?,?,? FROM application_status_events WHERE application_id=?",
+                    id, previous.status().name(), status.name(), actorRole.name(), LocalDateTime.ofInstant(time, ZoneOffset.UTC), id);
+            notifyParticipants(previous, "Application " + status.name().toLowerCase(java.util.Locale.ROOT));
+        }
+
+        @Override public List<ApplicationTimeline.Event> statusEvents(UUID id) {
+            try (var query = connection.prepareStatement("SELECT new_status,changed_utc FROM application_status_events"
+                    + " WHERE application_id=? ORDER BY sequence_no")) {
+                query.setString(1, id.toString());
+                try (var rows = query.executeQuery()) {
+                    var events = new ArrayList<ApplicationTimeline.Event>();
+                    while (rows.next()) {
+                        var instant = rows.getObject("changed_utc", LocalDateTime.class).toInstant(ZoneOffset.UTC);
+                        events.add(new ApplicationTimeline.Event(instant, rows.getString("new_status")));
+                    }
+                    return List.copyOf(events);
+                }
+            } catch (SQLException e) { throw Database.unavailable(); }
+        }
+
+        @Override public Optional<Instant> hiredAt(UUID id) {
+            try (var query = connection.prepareStatement("SELECT hired_at FROM applications WHERE id=?")) {
+                query.setString(1, id.toString());
+                try (var rows = query.executeQuery()) {
+                    return rows.next() ? Optional.ofNullable(rows.getTimestamp(1)).map(Timestamp::toInstant) : Optional.empty();
+                }
+            } catch (SQLException e) { throw Database.unavailable(); }
         }
         private void notifyParticipants(Application a, String event) {
             var job = jobs().lockJob(a.jobId()).orElseThrow();

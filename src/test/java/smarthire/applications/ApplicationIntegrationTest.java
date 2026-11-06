@@ -46,7 +46,7 @@ class ApplicationIntegrationTest {
         assertThrows(UserError.class, () -> restarted.download(f.company, a.id()));
     }
 
-    @Test void duplicateWithdrawalAndTerminalStatesCannotBypassUniquenessOrFrozenRequirements() {
+    @Test void duplicateWithdrawalAndTerminalStatesCannotBypassUniquenessOrFrozenRequirements() throws Exception {
         long job = f.publish(); f.confirm(f.student, List.of(f.skill));
         var a = f.applications.apply(f.student, job);
         assertThrows(UserError.class, () -> f.applications.apply(f.student, job));
@@ -57,11 +57,20 @@ class ApplicationIntegrationTest {
         assertThrows(UserError.class, () -> f.jobs.submit(f.company, job, f.details()));
         assertThrows(UserError.class, () -> f.applications.transition(f.company, a.id(), Application.Status.HIRED));
         assertEquals(Application.Status.WITHDRAWN, f.applications.open(f.student, a.id()).application().status());
+        var timeline = f.applications.timeline(f.student, a.id());
+        assertEquals(timeline, f.applications.timeline(f.company, a.id()));
+        assertEquals(List.of("Submitted", "Shortlisted", "Withdrawn"), timeline.events().stream()
+                .map(ApplicationTimeline.Event::label).toList());
         f.confirm(f.secondStudent, List.of(f.skill)); var second = f.applications.apply(f.secondStudent, job);
         f.applications.transition(f.company, second.id(), Application.Status.SHORTLISTED);
         f.applications.transition(f.company, second.id(), Application.Status.HIRED);
         assertThrows(UserError.class, () -> f.applications.transition(f.secondStudent, second.id(), Application.Status.WITHDRAWN));
         assertThrows(UserError.class, () -> f.applications.transition(f.company, second.id(), Application.Status.REJECTED));
+        assertEquals(List.of("Submitted", "Shortlisted", "Hired"), f.applications.timeline(f.company, second.id())
+                .events().stream().map(ApplicationTimeline.Event::label).toList());
+        f.execute("DELETE FROM application_status_events WHERE application_id=?", second.id().toString());
+        assertEquals(List.of("Submitted", "Hired"), f.applications.timeline(f.company, second.id())
+                .events().stream().map(ApplicationTimeline.Event::label).toList());
     }
 
     @Test void rolesOwnershipEligibilityMissingReviewAndMissingBytesAreEnforced() throws Exception {
@@ -74,6 +83,7 @@ class ApplicationIntegrationTest {
         for (UUID forbidden : List.of(f.secondStudent, f.foreignCompany, f.admin)) {
             assertThrows(UserError.class, () -> f.applications.open(forbidden, a.id()));
             assertThrows(UserError.class, () -> f.applications.download(forbidden, a.id()));
+            assertThrows(UserError.class, () -> f.applications.timeline(forbidden, a.id()));
             assertThrows(UserError.class, () -> f.applications.transition(forbidden, a.id(), Application.Status.REJECTED));
         }
         assertTrue(f.applications.list(f.foreignCompany, null, null).isEmpty());

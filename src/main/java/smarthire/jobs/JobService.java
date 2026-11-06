@@ -1,6 +1,7 @@
 package smarthire.jobs;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -20,15 +21,21 @@ public final class JobService {
     private final IdentityService identity;
     private final JobRepository repository;
     private final smarthire.documents.ManagedDocuments documents;
+    private final Clock clock;
 
     public JobService(IdentityService identity, JobRepository repository) {
         this(identity, repository, null);
     }
 
     public JobService(IdentityService identity, JobRepository repository, smarthire.documents.ManagedDocuments documents) {
+        this(identity, repository, documents, Clock.systemUTC());
+    }
+
+    public JobService(IdentityService identity, JobRepository repository, smarthire.documents.ManagedDocuments documents, Clock clock) {
         this.identity = identity;
         this.repository = repository;
         this.documents = documents;
+        this.clock = clock;
     }
 
     private <T> T access(UUID session, Role role, Function<JobRepository.Store, T> work) {
@@ -98,7 +105,9 @@ public final class JobService {
                 if (previous.status() == Status.CLOSED) { throw new UserError("Closed jobs cannot be edited. Create a new posting."); }
                 if (store.hasApplications(id)) { throw new UserError("This job has applications. Its requirements are frozen; close it and create a revised posting."); }
             }
-            return store.saveJob(actor.id(), id, validate(store, details));
+            Details validated = validate(store, details);
+            requireFutureDeadline(validated);
+            return store.saveJob(actor.id(), id, validated);
         });
     }
 
@@ -112,10 +121,12 @@ public final class JobService {
             if (approve && (!company.active() || !company.verified())) { throw new UserError("Only active, verified companies may publish jobs."); }
             if (approve) {
                 validate(store, job.details());
+                requireFutureDeadline(job.details());
                 new smarthire.matching.MatchEngine().assess(smarthire.cv.CvProfile.Qualifications.empty(), job.details(),
                         new SkillVocabulary(store.skills()), store.activePolicy());
             }
             store.status(id, approve ? Status.APPROVED : Status.REJECTED, decision);
+            if (approve) { store.notifySavedSearches(id, clock.instant()); }
             store.audit(admin.id(), new AdminActivity.Change(AdminActivity.Action.JOB_MODERATION, "JOB",
                     Long.toString(id), approve ? "APPROVED" : "REJECTED"));
             return null;
@@ -132,17 +143,39 @@ public final class JobService {
     }
 
     public List<Job> list(UUID session, String title, Long categoryId) {
+        return list(session, new JobSearch(title, categoryId));
+    }
+
+    public List<Job> list(UUID session, JobSearch criteria) {
         Profile actor = identity.profile(session);
-        String query = title == null ? "" : title.strip().toLowerCase(Locale.ROOT);
-        return access(session, actor.role(), store -> (actor.role() == Role.STUDENT ? store.unfilledJobs() : store.jobs()).stream()
-                .filter(job -> switch (actor.role()) {
-                    case ADMIN -> true;
-                    case COMPANY -> job.companyId() == actor.id();
-                    case STUDENT -> published(store, job);
-                })
-                .filter(job -> job.details().title().toLowerCase(Locale.ROOT).contains(query))
-                .filter(job -> categoryId == null || job.details().categoryId() == categoryId)
-                .toList());
+        return access(session, actor.role(), store -> store.search(criteria,
+                actor.role() == Role.COMPANY ? actor.id() : null, actor.role() == Role.STUDENT ? clock.instant() : null));
+    }
+
+    public List<SavedSearch> savedSearches(UUID session) {
+        Profile actor = identity.requireRole(session, Role.STUDENT);
+        return access(session, Role.STUDENT, store -> store.savedSearches(actor.id()));
+    }
+
+    public void saveSearch(UUID session, SavedSearch search) {
+        Profile actor = identity.requireRole(session, Role.STUDENT);
+        String name = text(search.name(), "Search name", 120);
+        access(session, Role.STUDENT, store -> {
+            var category = search.criteria().categoryId();
+            if (category != null && store.categories().stream().noneMatch(item -> item.id() == category)) {
+                throw new UserError("Choose an existing category.");
+            }
+            store.saveSearch(actor.id(), new SavedSearch(search.id(), name, search.criteria(), search.active()));
+            return null;
+        });
+    }
+
+    public void deleteSearch(UUID session, long searchId) {
+        Profile actor = identity.requireRole(session, Role.STUDENT);
+        access(session, Role.STUDENT, store -> {
+            store.deleteSearch(actor.id(), searchId);
+            return null;
+        });
     }
 
     public List<HiringRecord> hiringHistory(UUID session) {
@@ -158,7 +191,7 @@ public final class JobService {
 
     public List<SavedJob> savedJobs(UUID session) {
         Profile actor = identity.requireRole(session, Role.STUDENT);
-        return access(session, Role.STUDENT, store -> store.savedJobs(actor.id()));
+        return access(session, Role.STUDENT, store -> store.savedJobs(actor.id(), clock.instant()));
     }
 
     public void saveBookmark(UUID session, long jobId) {
@@ -176,7 +209,7 @@ public final class JobService {
         access(session, Role.STUDENT, store -> { store.removeBookmark(actor.id(), jobId); return null; });
     }
 
-    public enum SavedStatus { AVAILABLE, CLOSED, FILLED, UNAVAILABLE }
+    public enum SavedStatus { AVAILABLE, CLOSED, FILLED, DEADLINE_PASSED, UNAVAILABLE }
     public record SavedJob(long jobId, String title, SavedStatus status, java.util.UUID applicationId) { }
 
     public Job open(UUID session, long id) {
@@ -262,13 +295,12 @@ public final class JobService {
         return documents;
     }
 
-    private static boolean visible(JobRepository.Store store, Job job) {
-        return published(store, job) && job.remainingVacancies() > 0;
+    private boolean visible(JobRepository.Store store, Job job) {
+        return job.accepting(company(store, job.companyId()), clock.instant());
     }
 
-    private static boolean published(JobRepository.Store store, Job job) {
-        Company company = company(store, job.companyId());
-        return job.status() == Status.APPROVED && company.active() && company.verified();
+    private void requireFutureDeadline(Details details) {
+        if (details.expired(clock.instant())) { throw new UserError("Choose an application deadline in the future."); }
     }
 
     private static Company company(JobRepository.Store store, long id) {
@@ -334,7 +366,7 @@ public final class JobService {
         if (!scored) { throw new UserError("Add at least one scored requirement."); }
         if (experience != tag) { throw new UserError("Positive experience requires at least one relevance skill tag, and tags require positive experience."); }
         if (field && !degree) { throw new UserError("A degree field requires a minimum degree."); }
-        return new Details(title, description, details.categoryId(), location, min, max, requirements, details.vacancyCount());
+        return new Details(title, description, details.categoryId(), location, min, max, requirements, details.vacancyCount(), details.deadline());
     }
 
     private static String canonical(String value) {

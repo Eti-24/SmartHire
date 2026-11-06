@@ -57,6 +57,15 @@ Each sample has Bachelor in Computer Science. Only skills and education are acti
 4. Publish a fresh job with two vacancies and submit two eligible fictional applications. Hire one and check that the job stays visible to students. Hire the second and check that it leaves discovery and enters student Hiring history. Company Hiring history shows both hires.
 5. In admin **Activity log**, filter for a job moderation, a CV decision, or a data export. Use fictional records for any erase demonstration. The log retains the erase outcome after the target disappears from Data management.
 
+## Local roadmap walkthrough
+
+1. As a student, open **My CV** and choose **Download CV template (.docx)**. Save it, replace the bracketed prompts in Word, and upload the edited file. Confirm the suggested qualifications and approve the new version through **CV review**.
+2. As a company, choose **Create job** and download the circular template. Enter an application deadline and its time zone. Submit the job, attach the edited circular, and approve the posting as an admin. Check its search filters and the behavior at the deadline.
+3. As a student, use **More filters** and **Save this search** in **Find jobs**. Approve a new matching posting as admin. Open the neutral notice from the student inbox and check that a filled, expired or withdrawn posting no longer opens from that link.
+4. Submit an application and shortlist it as the recruiter. Open **Timeline** from both accounts. In **Interview**, propose a start and end time with a time zone, then accept as the student. Request another time, confirm the replacement, and cancel as the recruiter. Check that both participants can see the revisions in SmartHire.
+5. Open **Reports** as the company and the administrator. Compare conversion and average times for the same posting and date range. Move the cohort dates beyond the applications and check that the current capacity remains visible.
+6. Use a disposable fictional account for **Change password** and **Recovery codes** in **My profile**. Save the generated codes somewhere private, sign out and reset through **Recover with a saved code**. Check that a used code and the other codes from that set are refused.
+
 ## Failures to demonstrate safely
 
 Use `src/test/resources/documents/textless.pdf` or `encrypted.pdf` to show readable import errors. An existing reviewed CV must remain available after a refused upload or cancelled review. Use another company's account to show that it cannot open someone else's applicant records. Do not manually delete managed files in the live demo to simulate missing bytes; automated integration tests exercise that case in isolated storage.

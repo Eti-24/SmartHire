@@ -102,6 +102,9 @@ class IdentityTest {
     }
 
     private static final class MemoryAccounts implements AccountRepository {
+        @Override public boolean changePassword(long id, long version, String hash) { throw new UnsupportedOperationException(); }
+        @Override public boolean replaceRecoveryCodes(long id, long version, java.util.List<byte[]> hashes) { throw new UnsupportedOperationException(); }
+        @Override public boolean recoverPassword(String email, byte[] codeHash, String hash) { throw new UnsupportedOperationException(); }
         private final Map<Long, Account> rows = new HashMap<>();
 
         public Optional<Account> findByEmail(String email) {

@@ -4,7 +4,9 @@ import html
 import re
 
 ROOT = Path(__file__).resolve().parent.parent
-schema = (ROOT / "src/main/resources/db/schema.sql").read_text(encoding="utf-8")
+resources = ROOT / "src/main/resources/db"
+schema = "\n".join(path.read_text(encoding="utf-8")
+                   for path in [resources / "schema.sql", *sorted(resources.glob("migration-*.sql"))])
 tables = {}
 links = []
 for name, body in re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\) ENGINE", schema, re.S):
@@ -15,7 +17,7 @@ for name, body in re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\) ENGI
     if match:
         primary = [c.strip() for c in match[1].split(",")]
     for line in body.splitlines():
-        field = re.match(r"\s*(\w+)\s+(BIGINT|TINYINT|INT|VARCHAR\(\d+\)|CHAR\(\d+\)|BOOLEAN|(?:TIMESTAMP|DATETIME)(?:\(\d+\))?|DECIMAL\(\d+,\d+\)|DOUBLE|TEXT|MEDIUMTEXT|ENUM\([^)]+\))", line)
+        field = re.match(r"\s*(\w+)\s+(BIGINT|TINYINT|INT|VARCHAR\(\d+\)|(?:CHAR|BINARY)\(\d+\)|BOOLEAN|(?:TIMESTAMP|DATETIME)(?:\(\d+\))?|DECIMAL\(\d+,\d+\)|DOUBLE|TEXT|MEDIUMTEXT|ENUM\([^)]+\))", line)
         if field:
             col, kind = field.groups()
             if "PRIMARY KEY" in line:
@@ -39,6 +41,8 @@ layout = {
     "scoring_policies": (0, 5), "scoring_policy_current": (1, 5), "job_catalog_lock": (2, 5), "cv_approvals": (1, 4),
     "saved_jobs": (3, 5), "interview_notices": (0, 6), "interview_events": (1, 6),
     "application_notes": (2, 6), "interview_feedback": (3, 6), "admin_activity": (0, 7), "schema_migrations": (1, 7),
+    "application_status_events": (2, 7), "account_recovery_codes": (3, 7),
+    "saved_job_searches": (0, 8), "saved_search_notices": (1, 8),
 }
 assert set(layout) == set(tables), "Update the diagram layout for new/removed tables"
 esc = html.escape

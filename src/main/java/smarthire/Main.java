@@ -33,6 +33,17 @@ public final class Main {
             checkDatabase(config);
             return;
         }
+        if (args.length == 1 && args[0].equals("--upgrade-database")) {
+            try {
+                Database database = Database.load(config, false);
+                database.upgradeCloudSchema();
+                System.out.println("Cloud MySQL schema is ready.");
+            } catch (UserError exception) {
+                System.err.println(exception.getMessage());
+                System.exit(1);
+            }
+            return;
+        }
         if (args.length == 1 && args[0].equals("--seed-demo")) {
             try {
                 Database database = Database.load(config, false);

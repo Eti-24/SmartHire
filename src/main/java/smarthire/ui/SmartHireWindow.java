@@ -155,6 +155,7 @@ public final class SmartHireWindow extends JFrame {
         JButton signIn = new JButton("Sign in");
         JButton register = new JButton("Create an account");
         form.add(formActions(signIn, register));
+        form.add(WorkspaceStyle.button("Recover with a saved code", () -> credentialForm(null)));
         signIn.addActionListener(event -> {
             String address = email.getText();
             char[] secret = password.getPassword();
@@ -292,6 +293,7 @@ public final class SmartHireWindow extends JFrame {
         if (role == Role.STUDENT) {
             if (matches != null) { nav("Job matches", this::showMatches); }
             if (jobs != null) { nav("Saved jobs", this::showSavedJobs); }
+            if (jobs != null) { nav("Saved searches", this::showSavedSearches); }
             if (cvs != null) { nav("My CV", () -> showBody("My CV", new CvPanel(cvs, session, null), false)); }
         }
         if (applications != null && role != Role.ADMIN) {
@@ -316,8 +318,10 @@ public final class SmartHireWindow extends JFrame {
             }
         }
         if (workspace != null) {
-            nav("Notifications", () -> showBody("Notifications",
-                    new WorkspacePanel(workspace, session, WorkspacePanel.Page.NOTICES), false));
+            nav("Notifications", () -> showNotices(role));
+            if (role != Role.STUDENT) {
+                nav("Reports", () -> showBody("Reports", new ReportsPanel(workspace, session), false));
+            }
         }
         nav("My profile", () -> run(() -> identity.profile(session), this::editProfile));
 
@@ -374,6 +378,10 @@ public final class SmartHireWindow extends JFrame {
         JButton save = new JButton("Save profile");
         JButton back = new JButton("Back to overview");
         form.add(formActions(save, back));
+        var security = WorkspaceStyle.actions();
+        security.add(WorkspaceStyle.button("Change password", () -> credentialForm(profile)));
+        security.add(WorkspaceStyle.button("Recovery codes", () -> issueRecoveryCodes(profile)));
+        form.add(security);
         save.addActionListener(event -> {
             String newName = name.getText();
             String newPhone = phone.getText();
@@ -391,6 +399,70 @@ public final class SmartHireWindow extends JFrame {
         getRootPane().setDefaultButton(save);
     }
 
+    private void credentialForm(Profile profile) {
+        boolean recovery = profile == null;
+        var form = WorkspaceStyle.form();
+        var email = new JTextField(28);
+        var credential = new JPasswordField(28);
+        var password = new JPasswordField(28);
+        var confirmation = new JPasswordField(28);
+        if (recovery) { field(form, "Email", email); }
+        field(form, recovery ? "Saved recovery code" : "Current password", credential);
+        field(form, "New password (10–128 characters)", password);
+        field(form, "Confirm new password", confirmation);
+        var save = WorkspaceStyle.button(recovery ? "Reset password" : "Change password", () -> {
+            var address = email.getText();
+            var sessionId = session;
+            char[] existing = credential.getPassword();
+            char[] replacement = password.getPassword();
+            char[] repeated = confirmation.getPassword();
+            credential.setText(""); password.setText(""); confirmation.setText("");
+            run(() -> {
+                try {
+                    if (recovery) { identity.recoverPassword(address, existing, replacement, repeated); }
+                    else { identity.changePassword(sessionId, existing, replacement, repeated); }
+                    return true;
+                } finally {
+                    Arrays.fill(existing, '\0'); Arrays.fill(replacement, '\0'); Arrays.fill(repeated, '\0');
+                }
+            }, updated -> {
+                session = null;
+                login();
+                status.setText("Password updated. Sign in with your new password.");
+            });
+        });
+        var back = WorkspaceStyle.button(recovery ? "Back to sign in" : "Back to profile",
+                () -> { if (recovery) { login(); } else { editProfile(profile); } });
+        form.add(formActions(save, back));
+        showBody(recovery ? "Account recovery" : "Change password", form);
+        getRootPane().setDefaultButton(save);
+        status.setText(recovery ? "Use a code you saved earlier. A successful reset uses up the whole set."
+                : "Changing your password signs you out and revokes any saved recovery codes.");
+    }
+
+    private void issueRecoveryCodes(Profile profile) {
+        var form = WorkspaceStyle.form();
+        var password = new JPasswordField(28);
+        field(form, "Current password", password);
+        var generate = WorkspaceStyle.button("Generate new codes", () -> {
+            var sessionId = session;
+            char[] secret = password.getPassword();
+            password.setText("");
+            run(() -> {
+                try { return identity.issueRecoveryCodes(sessionId, secret); }
+                finally { Arrays.fill(secret, '\0'); }
+            }, codes -> javax.swing.JOptionPane.showMessageDialog(this,
+                    WorkspaceStyle.text("Save these codes somewhere private. They are shown once.\n"
+                            + "A successful reset uses up the whole set.\n\n" + String.join("\n", codes)),
+                    "Recovery codes", javax.swing.JOptionPane.PLAIN_MESSAGE));
+        });
+        var back = WorkspaceStyle.button("Back to profile", () -> editProfile(profile));
+        form.add(formActions(generate, back));
+        showBody("Recovery codes", form);
+        getRootPane().setDefaultButton(generate);
+        status.setText("Generating codes replaces any previous set.");
+    }
+
     private void showMatches() {
         showBody("Job matches", new MatchesPanel(matches, cvs, session,
                 id -> showBody("Job details",
@@ -405,6 +477,18 @@ public final class SmartHireWindow extends JFrame {
                         "Back to saved jobs"), false),
                 applications == null ? null : id -> showBody("My applications",
                         new ApplicationsPanel(applications, session, Role.STUDENT, id), false)), false);
+    }
+
+    private void showSavedSearches() {
+        showBody("Saved searches", new SavedSearchPanel(jobs, session,
+                search -> showBody("Saved searches", new JobsPanel(jobs, session, Role.STUDENT, this::showSavedSearches,
+                        0, applications, "Back to saved searches", search), false)), false);
+    }
+
+    private void showNotices(Role role) {
+        showBody("Notifications", new WorkspacePanel(workspace, session, WorkspacePanel.Page.NOTICES,
+                role != Role.STUDENT || jobs == null ? null : id -> showBody("Notifications",
+                        new JobsPanel(jobs, session, role, () -> showNotices(role), id, applications, "Back to notifications"), false)), false);
     }
 
     private void showBody(String title, Component body) {

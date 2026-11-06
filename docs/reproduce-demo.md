@@ -43,7 +43,7 @@ password=YOUR_DATABASE_PASSWORD
 trustStore=aiven-truststore.p12
 ```
 
-Launch with `.\scripts\run.ps1 -Cloud`. Startup creates missing tables in the configured schema. The connection checks the server certificate and hostname against the project CA. The regular launcher and verification scripts use the local MySQL configuration.
+For a fresh or older Aiven schema, follow the backup steps in the [Windows release guide](windows-release.md#connect-to-aiven) and run `.\scripts\run.ps1 -Cloud -UpgradeDatabase` once. Then launch with `.\scripts\run.ps1 -Cloud`. The connection checks the server certificate and hostname against the project CA. The regular launcher and verification scripts use the local MySQL configuration.
 
 To populate Aiven with fictional demo accounts and jobs, create the ignored file `.local/aiven-demo-accounts.properties` with two independent random passwords of at least 16 characters, under `adminPassword` and `demoPassword`. Then run `.\scripts\run.ps1 -Cloud -SeedDemo`. Use the admin password for `admin@smarthire.example` and the demo password for the fictional company and student accounts. Reseeding keeps existing account passwords and skips companies that already have postings.
 
@@ -72,7 +72,7 @@ In NetBeans set the main class to `smarthire.Main` and working directory to the 
 
 Start the server with `scripts/start-mysql.ps1`; Workbench is a client and does not start it. Launch `scripts/start-workbench.ps1`, click the plus beside MySQL Connections, name it SmartHire local, choose Standard TCP/IP, host `127.0.0.1`, port `3306`, username `smarthire`, and default schema `smarthire`. Use the generated local password from `.local/database.json` when prompted, then Test Connection and open it. Refresh Schemas after the first app launch. Use the SQL editor to inspect `SELECT VERSION();` and `SHOW TABLES;`.
 
-For a fresh schema import, open `src/main/resources/db/schema.sql` in an SQL tab attached to the intended database and execute it. The target database and grants must already exist. Choose `smarthire_test` for test inspection. The complete ER export is `docs/database/er-diagram.html`. Its inline SVG and exact foreign-key table work offline. Standalone SVG and editable Mermaid source are beside it. It shows all 30 tables and 33 foreign keys.
+For a fresh schema import, open `src/main/resources/db/schema.sql` in an SQL tab attached to the intended database and execute it. The target database and grants must already exist. The app applies the numbered migrations on first local startup. Choose `smarthire_test` for test inspection. The complete ER export is `docs/database/er-diagram.html`. Its inline SVG and exact foreign-key table work offline. Standalone SVG and editable Mermaid source are beside it. It shows all 34 tables and 40 foreign keys.
 
 ## Automated checks
 

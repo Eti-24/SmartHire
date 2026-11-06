@@ -92,6 +92,8 @@ public final class CvPanel extends JPanel {
             var upload = WorkspaceStyle.button(current == null ? "Upload CV" : "Replace CV", this::upload);
             WorkspaceStyle.primary(upload);
             toolbar.add(upload);
+            button(toolbar, "Download CV template (.docx)",
+                    () -> FileSaveDialog.template(this, FileSaveDialog.CV, message::setText));
             if (current != null) {
                 button(toolbar, "Edit current review", () -> work(() -> service.edit(session), this::review));
             }

@@ -72,9 +72,14 @@ final class JdbcAdminData implements AdminData.Store {
             exportTable(writeTable, "notifications", "user_id=?", scope);
         }
         if (target.kind() == Kind.COMPANY) { exportTable(writeTable, "companies", "user_id=?", scope); }
-        if (target.kind() == Kind.STUDENT) { exportTable(writeTable, "saved_jobs", "student_id=?", scope); }
+        if (target.kind() == Kind.STUDENT) {
+            exportTable(writeTable, "saved_jobs", "student_id=?", scope);
+            exportTable(writeTable, "saved_job_searches", "student_id=?", scope);
+            exportTable(writeTable, "saved_search_notices", "student_id=?", scope);
+        }
         exportTable(writeTable, "applications", scope.applications(), scope);
         exportTable(writeTable, "interview_events", scope.applicationChildren(), scope);
+        exportTable(writeTable, "application_status_events", scope.applicationChildren(), scope);
         exportTable(writeTable, "interview_notices", scope.applicationChildren(), scope);
         exportTable(writeTable, "application_notes", scope.applicationChildren(), scope);
         exportTable(writeTable, "interview_feedback", scope.applicationChildren(), scope);
@@ -134,6 +139,7 @@ final class JdbcAdminData implements AdminData.Store {
         delete("notifications", scope.applicationNotices(), scope);
         delete("notifications", scope.interviewNotices(), scope);
         delete("notifications", scope.jobNotices(), scope);
+        delete("notifications", scope.savedSearchNotices(), scope);
         delete("notifications", scope.cvNotices(), scope);
         delete("applications", scope.applications(), scope);
         delete("job_circulars", scope.jobChildren(), scope);
@@ -221,6 +227,9 @@ final class JdbcAdminData implements AdminData.Store {
         String cvChildren() { return versions == null ? null : "version_id IN (SELECT id FROM cv_versions WHERE " + versions + ")"; }
         String applicationChildren() { return "application_id IN (SELECT id FROM applications WHERE " + applications + ")"; }
         String interviewNotices() { return "id IN (SELECT notice_id FROM interview_notices WHERE " + applicationChildren() + ")"; }
+        String savedSearchNotices() {
+            return jobs == null ? null : "id IN (SELECT notice_id FROM saved_search_notices WHERE " + jobChildren() + ")";
+        }
         String documents() {
             return jobs == null ? "id IN (SELECT document_id FROM cv_versions WHERE " + versions + ")"
                     : "id IN (SELECT document_id FROM job_circular_versions WHERE " + jobChildren() + ")";

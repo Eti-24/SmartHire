@@ -25,14 +25,19 @@ public final class WorkspaceService {
         return repository.transaction(store -> { store.requireActive(actor.id(), actor.role()); return work.apply(store); });
     }
     public List<Notice> notices(UUID session) {
-        long id = identity.profile(session).id(); return access(session, null, s -> s.notices(id));
+        long id = identity.profile(session).id(); return access(session, null, s -> s.notices(id, java.time.Instant.now()));
     }
     public void markRead(UUID session, UUID noticeId) {
         long id = identity.profile(session).id();
         access(session, null, s -> { if (!s.markRead(id, noticeId)) { throw new UserError("Notification not found in your inbox."); } return null; });
     }
     public Dashboard dashboard(UUID session) {
-        Profile actor = identity.profile(session); return access(session, null, s -> s.dashboard(actor.id(), actor.role()));
+        Profile actor = identity.profile(session); return access(session, null, s -> s.dashboard(actor.id(), actor.role(), java.time.Instant.now()));
+    }
+    public RecruitmentReport recruitmentReport(UUID session, RecruitmentReport.Filter filter) {
+        Profile actor = identity.profile(session);
+        if (actor.role() == Role.STUDENT) { throw new UserError("Recruitment reports are available to companies and admins."); }
+        return access(session, actor.role(), store -> store.recruitmentReport(actor.role() == Role.COMPANY ? actor.id() : null, filter));
     }
     public List<AccountSummary> accounts(UUID session) { return access(session, Role.ADMIN, Store::accounts); }
     public void setActive(UUID session, long id, boolean active) {

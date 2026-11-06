@@ -87,6 +87,13 @@ class CleanDatabaseSmokeTest {
                     assertEquals(1, workspace.monitor(administrator, new WorkspaceRepository.Filter(job, null, null, null)).size());
                     assertEquals(1, workspace.dashboard(student).applicationStatuses().get("HIRED"));
                     verifyVacancyUpgrade(database, jobs, company, student, job, application.id());
+                    verifyLocalRoadmapUpgrade(database, identity, applications, student, application.id());
+                    char[] priorPassword = "SmartHireDemo!21".toCharArray();
+                    char[] newPassword = "Disposable-seed-password!21".toCharArray();
+                    identity.changePassword(student, priorPassword, newPassword, newPassword);
+                    DemoSeed.provision(accounts);
+                    assertThrows(UserError.class, () -> identity.login("student@smarthire.example", priorPassword));
+                    assertNotNull(identity.login("student@smarthire.example", newPassword));
                 }
                 // Reopen the actual managed store with a fresh reference repository.
                 try (var reopened = new ManagedDocuments(root.resolve("documents"), new JdbcDocumentReferences(database))) { assertTrue(reopened.reconcile().unavailableReferences().isEmpty()); }
@@ -94,6 +101,34 @@ class CleanDatabaseSmokeTest {
             } finally {
                 if (created) { try (var statement = control.createStatement()) { statement.execute("DROP DATABASE " + schema); } }
             }
+        }
+    }
+
+    private static void verifyLocalRoadmapUpgrade(Database database, IdentityService identity, ApplicationService applications,
+            UUID student, UUID application) throws Exception {
+        try (var connection = database.connect(); var statement = connection.createStatement()) {
+            // Recreate the version-01 shape in this disposable schema while preserving the real demo records.
+            statement.execute("DROP TABLE saved_search_notices,saved_job_searches,application_status_events,account_recovery_codes");
+            statement.execute("ALTER TABLE jobs DROP CHECK job_deadline_has_zone,"
+                    + " DROP COLUMN application_deadline_at,DROP COLUMN application_deadline_zone");
+            statement.execute("ALTER TABLE users DROP COLUMN credential_version");
+            statement.execute("DELETE FROM schema_migrations WHERE version>1");
+        }
+        database.initialize();
+        try (var connection = database.connect(); var statement = connection.createStatement()) {
+            // DDL committed, but startup stopped before marking its migrations complete.
+            statement.execute("DELETE FROM schema_migrations WHERE version>1");
+        }
+        database.initialize();
+        database.initialize();
+        assertEquals(Role.STUDENT, identity.requireRole(student, Role.STUDENT).role());
+        assertEquals(Application.Status.HIRED, applications.timeline(student, application).currentStatus());
+        assertEquals(List.of("Submitted"), applications.timeline(student, application).events().stream()
+                .map(ApplicationTimeline.Event::label).toList());
+        try (var connection = database.connect(); var statement = connection.createStatement();
+                var row = statement.executeQuery("SELECT COUNT(*) FROM schema_migrations WHERE version BETWEEN 1 AND 5")) {
+            assertTrue(row.next());
+            assertEquals(5, row.getInt(1));
         }
     }
 

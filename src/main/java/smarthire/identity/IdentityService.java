@@ -1,12 +1,20 @@
 package smarthire.identity;
 
 import java.util.Locale;
+import java.util.List;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.UUID;
+import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class IdentityService {
     private final AccountRepository accounts;
-    private final ConcurrentHashMap<UUID, Long> sessions = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Session> sessions = new ConcurrentHashMap<>();
+    private final HashMap<String, Integer> recoveryAttempts = new HashMap<>();
+    private Instant recoveryWindowEnd = Instant.EPOCH;
+    private int recoveryAttemptTotal;
+    private record Session(long id, long credentialVersion) {}
 
     public IdentityService(AccountRepository accounts) {
         this.accounts = accounts;
@@ -18,9 +26,7 @@ public final class IdentityService {
         }
         String normalized = email(email);
         String validName = text(name, "Name", 120, true);
-        if (password == null || password.length < 10 || password.length > 128) {
-            throw new UserError("Password must contain 10 to 128 characters.");
-        }
+        validatePassword(password);
         return Profile.from(accounts.create(normalized, Passwords.hash(password), role, validName));
     }
 
@@ -34,7 +40,7 @@ public final class IdentityService {
             throw new UserError("Email or password is incorrect, or this account is disabled.");
         }
         UUID session = UUID.randomUUID();
-        sessions.put(session, account.id());
+        sessions.put(session, new Session(account.id(), account.credentialVersion()));
         return session;
     }
 
@@ -64,15 +70,87 @@ public final class IdentityService {
         }
     }
 
+    public void changePassword(UUID session, char[] current, char[] replacement, char[] confirmation) {
+        Account account = verifyCurrentPassword(session, current);
+        validateReplacement(replacement, confirmation);
+        if (!accounts.changePassword(account.id(), account.credentialVersion(), Passwords.hash(replacement))) {
+            throw new UserError("Credentials changed or the account became unavailable. Sign in again.");
+        }
+        logout(session);
+    }
+
+    public List<String> issueRecoveryCodes(UUID session, char[] current) {
+        Account account = verifyCurrentPassword(session, current);
+        List<String> codes = RecoveryCodes.generate();
+        var hashes = codes.stream().map(code -> {
+            char[] characters = code.toCharArray();
+            try { return RecoveryCodes.hash(characters); }
+            finally { Arrays.fill(characters, '\0'); }
+        }).toList();
+        if (!accounts.replaceRecoveryCodes(account.id(), account.credentialVersion(), hashes)) {
+            throw new UserError("Credentials changed or the account became unavailable. Sign in again.");
+        }
+        return codes;
+    }
+
+    public void recoverPassword(String email, char[] code, char[] replacement, char[] confirmation) {
+        validateReplacement(replacement, confirmation);
+        String address;
+        try { address = email(email); }
+        catch (UserError e) { address = ""; }
+        if (!allowRecoveryAttempt(address)
+                || !accounts.recoverPassword(address, RecoveryCodes.hash(code), Passwords.hash(replacement))) {
+            throw new UserError("Recovery failed. Check your email and code, or wait 15 minutes before trying again.");
+        }
+        synchronized (this) { recoveryAttempts.remove(address); }
+    }
+
+    private synchronized boolean allowRecoveryAttempt(String email) {
+        Instant now = Instant.now();
+        if (!now.isBefore(recoveryWindowEnd)) {
+            recoveryAttempts.clear();
+            recoveryAttemptTotal = 0;
+            recoveryWindowEnd = now.plusSeconds(900);
+        }
+        int attempts = recoveryAttempts.getOrDefault(email, 0);
+        if (attempts >= 5 || recoveryAttemptTotal >= 30) { return false; }
+        recoveryAttempts.put(email, attempts + 1);
+        recoveryAttemptTotal++;
+        return true;
+    }
+
+    private Account verifyCurrentPassword(UUID session, char[] current) {
+        Account account = authenticated(session);
+        if (current == null || current.length > 128 || !Passwords.matches(current, account.passwordHash())) {
+            throw new UserError("The current password is incorrect.");
+        }
+        return account;
+    }
+
+    private static void validateReplacement(char[] password, char[] confirmation) {
+        validatePassword(password);
+        if (!Arrays.equals(password, confirmation)) { throw new UserError("The new passwords do not match."); }
+    }
+
+    private static void validatePassword(char[] password) {
+        if (password == null || password.length < 10 || password.length > 128) {
+            throw new UserError("Password must contain 10 to 128 characters.");
+        }
+    }
+
     private Account authenticated(UUID session) {
-        Long id = session == null ? null : sessions.get(session);
-        if (id == null) {
+        Session loggedIn = session == null ? null : sessions.get(session);
+        if (loggedIn == null) {
             throw new UserError("Please sign in again.");
         }
-        Account account = accounts.findById(id).orElseThrow(() -> new UserError("Please sign in again."));
+        Account account = accounts.findById(loggedIn.id()).orElseThrow(() -> new UserError("Please sign in again."));
         if (!account.active()) {
             sessions.remove(session);
             throw new UserError("This account is disabled. Please contact the administrator.");
+        }
+        if (account.credentialVersion() != loggedIn.credentialVersion()) {
+            sessions.remove(session);
+            throw new UserError("Your credentials changed. Please sign in again.");
         }
         return account;
     }

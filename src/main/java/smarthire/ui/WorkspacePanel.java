@@ -27,14 +27,20 @@ final class WorkspacePanel extends JPanel {
 
     private final WorkspaceService service;
     private final UUID session;
+    private final Consumer<Long> openNoticeJob;
     private final JPanel body = new JPanel(new BorderLayout(0, 10));
     private final JTextArea message = WorkspaceStyle.message("Loading…");
     private boolean busy;
 
     WorkspacePanel(WorkspaceService service, UUID session, Page page) {
+        this(service, session, page, null);
+    }
+
+    WorkspacePanel(WorkspaceService service, UUID session, Page page, Consumer<Long> openNoticeJob) {
         super(new BorderLayout(0, 10));
         this.service = service;
         this.session = session;
+        this.openNoticeJob = openNoticeJob;
         add(body, BorderLayout.CENTER);
         add(message, BorderLayout.SOUTH);
         switch (page) {
@@ -105,14 +111,21 @@ final class WorkspacePanel extends JPanel {
             });
             WorkspaceStyle.primary(read);
             read.setEnabled(false);
+            var open = WorkspaceStyle.button("Open matching posting", () -> {
+                var notice = WorkspaceStyle.selected(table, entries);
+                run(() -> { service.markRead(session, notice.id()); return notice.matchedJobId(); }, openNoticeJob);
+            });
+            open.setEnabled(false);
             WorkspaceStyle.previewSelection(table, entries, notice -> {
                 read.setEnabled(notice != null);
+                open.setEnabled(openNoticeJob != null && notice != null && notice.matchedJobId() != null);
                 if (notice == null) { preview.showRecord("Inbox", "Select a notification to preview its message."); }
                 else { preview.showRecord(notice.readAt() == null ? "New" : "Read",
                         WorkspaceStyle.date(notice.createdAt()) + "\n\n" + notice.message()); }
             });
             var actions = WorkspaceStyle.actions();
             actions.add(read);
+            if (openNoticeJob != null) { actions.add(open); }
             actions.add(WorkspaceStyle.button("Refresh", this::notices));
             display(table, preview, actions, null);
             message.setText(entries.isEmpty() ? "Your inbox is empty." : "Opening a notification marks it as read.");

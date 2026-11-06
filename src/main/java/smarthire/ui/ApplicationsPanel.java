@@ -153,6 +153,21 @@ final class ApplicationsPanel extends JPanel {
         qualifications.append("\nCertifications: ").append(String.join(", ", q.certifications()));
         tabs.addTab("Submitted qualifications", text(qualifications.toString()));
         var actions = new JPanel(new FlowLayout(FlowLayout.LEADING));
+        var timeline = new JPanel(new BorderLayout());
+        timeline.add(text("Loading timeline…"), BorderLayout.CENTER);
+        tabs.addTab("Timeline", timeline);
+        tabs.addChangeListener(event -> {
+            if (tabs.getSelectedComponent() != timeline) { return; }
+            run(() -> service.timeline(session, a.id()), result -> {
+                StringBuilder history = new StringBuilder("Current status: ").append(WorkspaceStyle.label(result.currentStatus()))
+                        .append("\nDates are shown in UTC. Earlier transitions without a recorded date are omitted.\n\n");
+                result.events().forEach(item -> history.append(item.time()).append("  ").append(item.label()).append('\n'));
+                timeline.removeAll();
+                timeline.add(text(history.toString()), BorderLayout.CENTER);
+                timeline.revalidate();
+                timeline.repaint();
+            });
+        });
         tabs.addTab("Interview", new InterviewsPanel(service, session, role, a.id()));
         if (role == Role.COMPANY) { tabs.addTab("Feedback", new RecruiterFeedbackPanel(service, session, a.id())); }
         button(actions, "Save submitted CV", () -> {
