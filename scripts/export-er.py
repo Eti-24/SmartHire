@@ -15,7 +15,7 @@ for name, body in re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\) ENGI
     if match:
         primary = [c.strip() for c in match[1].split(",")]
     for line in body.splitlines():
-        field = re.match(r"\s*(\w+)\s+(BIGINT|INT|VARCHAR\(\d+\)|CHAR\(\d+\)|BOOLEAN|TIMESTAMP(?:\(\d+\))?|DECIMAL\(\d+,\d+\)|DOUBLE|TEXT|MEDIUMTEXT|ENUM\([^)]+\))", line)
+        field = re.match(r"\s*(\w+)\s+(BIGINT|TINYINT|INT|VARCHAR\(\d+\)|CHAR\(\d+\)|BOOLEAN|(?:TIMESTAMP|DATETIME)(?:\(\d+\))?|DECIMAL\(\d+,\d+\)|DOUBLE|TEXT|MEDIUMTEXT|ENUM\([^)]+\))", line)
         if field:
             col, kind = field.groups()
             if "PRIMARY KEY" in line:
@@ -37,14 +37,17 @@ layout = {
     "job_circulars": (0, 3), "applications": (1, 3), "cv_current": (2, 3), "cv_evidence": (3, 3),
     "job_circular_versions": (0, 4), "cv_certifications": (2, 4), "cv_evidence_skills": (3, 4),
     "scoring_policies": (0, 5), "scoring_policy_current": (1, 5), "job_catalog_lock": (2, 5), "cv_approvals": (1, 4),
+    "saved_jobs": (3, 5), "interview_notices": (0, 6), "interview_events": (1, 6),
+    "application_notes": (2, 6), "interview_feedback": (3, 6), "admin_activity": (0, 7), "schema_migrations": (1, 7),
 }
 assert set(layout) == set(tables), "Update the diagram layout for new/removed tables"
 esc = html.escape
 positions = {name: (60 + col * 540, 150 + row * 420) for name, (col, row) in layout.items()}
-parts = ['<svg xmlns="http://www.w3.org/2000/svg" width="2240" height="2700" viewBox="0 0 2240 2700">',
+height = 180 + 420 * (max(row for _, row in layout.values()) + 1)
+parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="2240" height="{height}" viewBox="0 0 2240 {height}">',
          '<title>SmartHire complete physical ER diagram</title>',
          '<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#5e7e94"/></marker></defs>',
-         '<rect width="2240" height="2700" fill="#f5f8fb"/>',
+         f'<rect width="2240" height="{height}" fill="#f5f8fb"/>',
          '<g font-family="Segoe UI,Arial,sans-serif" fill="#17324d">',
          '<text x="60" y="55" font-size="32" font-weight="bold">SmartHire | complete physical ER diagram</text>',
          f'<text x="60" y="87" font-size="18">{len(tables)} tables | {len(links)} foreign keys | PK = primary key; FK = foreign key | arrows: child to parent</text>',
@@ -71,7 +74,7 @@ parts.append('</g></svg>')
 svg = "\n".join(parts)
 directory = ROOT / "docs" / "database"
 directory.mkdir(parents=True, exist_ok=True)
-(directory / "er-diagram.svg").write_text(svg, encoding="utf-8")
+(directory / "er-diagram.svg").write_text(svg, encoding="utf-8", newline="\n")
 rows = []
 mermaid = ["erDiagram"]
 for child, cols, parent, target, one, optional in links:
@@ -84,14 +87,15 @@ for name, (columns, primary, foreign) in tables.items():
     mermaid.append("    }")
 for i, (child, cols, parent, target, one, optional) in enumerate(links, 1):
     rows.append(f'<tr><td>{i}</td><td>{child} ({", ".join(cols)})</td><td>{parent} ({esc(target)})</td><td>{"0..1" if optional else "1"}</td><td>{"0..1" if one else "0..many"}</td></tr>')
-(directory / "er-diagram.mmd").write_text("\n".join(mermaid) + "\n", encoding="utf-8")
+(directory / "er-diagram.mmd").write_text("\n".join(mermaid) + "\n", encoding="utf-8", newline="\n")
 page = '''<!doctype html><html lang="en"><meta charset="utf-8"><title>SmartHire ER diagram</title>
 <style>body{font:16px Segoe UI,Arial;margin:32px;color:#17324d}svg{width:100%;height:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #cad9e3;padding:9px;text-align:left}th{background:#edf4f8}a{color:#087f8c}</style>
 <h1>SmartHire database</h1><p>Generated from src/main/resources/db/schema.sql. No network or special editor required.
 <a href="er-diagram.svg">Open the full SVG to zoom</a>. Arrows point from child to referenced parent.
 The last two columns describe parents per child and children per parent, including nullable references.</p>'''
 page += svg + '<h2>Exact foreign-key relationships</h2><table><tr><th>#</th><th>Child columns</th><th>Referenced columns</th><th>Parents per child</th><th>Children per parent</th></tr>' + "".join(rows) + '</table>'
-page += '''<h2>Constraints beyond the arrows</h2><p>Applications are unique by student/job, including withdrawn records. Their composite student/CV key prevents using another student's review. Current CV pointers reference that student's immutable version. CV evidence skill keys include version/kind/evidence ordinal. Skill aliases are scoped by skill; the service rejects ambiguous normalized phrases. The current scoring policy is a singleton pointer; original application policy/score/explanation remain saved separately. Notifications are deleted only if their owning user is deleted by an explicit maintenance operation; the app only disables accounts. CV approval belongs to the exact confirmed version; new versions and legacy missing decisions are Pending. Reviewer is nullable before a decision and uses SET NULL only for an explicit maintenance deletion; account disablement preserves it.</p>
+page += '''<h2>Constraints beyond the arrows</h2><p>Applications are unique by student/job, including withdrawn records. Their composite student/CV key prevents using another student's review. Current CV pointers reference that student's immutable version. CV evidence skill keys include version/kind/evidence ordinal. Skill aliases are scoped by skill; the service rejects ambiguous normalized phrases. The current scoring policy is a singleton pointer; original application policy/score/explanation remain saved separately. CV approval belongs to the exact confirmed version; new versions and legacy missing decisions are Pending. Account disablement preserves these records. Permanent erasure removes scoped dependent records and notices.</p>
+<p>Vacancy capacity derives from committed hired applications. Interview events are ordered by application and revision. Scorecards reference the confirmed occurrence. Audit targets are scalar identifiers so the activity can survive target erasure.</p>
 <p>job_catalog_lock is an independent singleton mutex. Original application policy is an immutable version label, not a database foreign key. Reviewed skills, evidence and certifications belong to CV versions; there is no persisted match cache or redundant mutable student-skill table.</p></html>'''
-(directory / "er-diagram.html").write_text(page, encoding="utf-8")
+(directory / "er-diagram.html").write_text(page, encoding="utf-8", newline="\n")
 print(f"Exported {len(tables)} tables and {len(links)} foreign keys to docs/database")

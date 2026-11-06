@@ -4,7 +4,7 @@
 
 - Upload → student corrects qualifications → Confirm → Pending admin approval. Drafts are not listed for admin review.
 - Admin has a separate **CV review** navigation button alongside job administration. It defaults to Pending, with filters for Approved, Rejected or all current submissions. Account name/email, confirmation time and active state identify each submission.
-- Review selected CV shows the exact version, original filename, extracted text and confirmed qualifications. Save original CV exports the immutable bytes for inspection in a PDF/Word viewer. Approval checks saved-byte integrity again.
+- Review CV version shows the exact version, original filename, extracted text and confirmed qualifications. Save original CV exports the immutable bytes for inspection in a PDF/Word viewer. Approval checks saved-byte integrity again.
 - An active admin can approve/reject only the active student's current Pending version. Rejection requires a reason (1–1000 characters). Both outcomes save reviewer/time, send a student notification, and become visible in My CV. Repeat/conflicting decisions are refused; the first committed decision wins.
 - A replacement or qualification-only edit creates another Pending version. The old decision stays in version history. Rejected students correct and confirm a new version. Existing legacy versions without an approval record count as Pending. An unconfirmed/cancelled draft leaves the old approved version usable.
 - New applications use only the approved **current** CV and still require readable bytes and every existing job/company/eligibility check. A 100% score does not bypass approval. Preview matching and comparison do not require approval.
@@ -14,7 +14,7 @@
 ## Manual journey
 
 1. Restart the rebuilt app to initialize the additive approval table. As student, open My CV, upload/confirm a sample and observe Pending. Job matches remains available; an eligible Apply attempt must explain the approval requirement.
-2. Sign in as admin → CV review → select the student's CV → Review selected CV. Inspect text/qualifications and save/open the original. Approve this CV version. Check the approved filter and Overview's CVs awaiting approval count.
+2. Sign in as admin → CV review → select the student's CV → Review CV version. Inspect text/qualifications and save/open the original. Approve this version. Check the approved filter and Overview's CVs awaiting approval count.
 3. As student, Refresh approval status in My CV; verify Approved and the saved notification. Apply to an eligible job. Another student's/company's account must not be able to approve or inspect this submission through the admin service.
 4. Edit confirmed qualifications or replace the CV. The new version must be Pending while the earlier approved version remains in history. Applying to a different job must fail until this new version is approved.
 5. Reject the new version with a correction reason. Confirm student feedback and notification, then correct/resubmit and approve the resulting new version. Existing applications must still show/download the original approved evidence.

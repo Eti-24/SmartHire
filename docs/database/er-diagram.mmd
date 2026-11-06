@@ -4,6 +4,8 @@ erDiagram
     skills ||--o{ skill_aliases : references
     companies ||--o{ jobs : references
     categories ||--o{ jobs : references
+    students ||--o{ saved_jobs : references
+    jobs ||--o{ saved_jobs : references
     jobs ||--o{ job_requirements : references
     students ||--o{ cv_versions : references
     managed_documents ||--o{ cv_versions : references
@@ -16,14 +18,23 @@ erDiagram
     cv_versions ||--o{ cv_certifications : references
     cv_versions ||--o{ applications : references
     jobs ||--o{ applications : references
+    applications ||--o{ interview_events : references
+    applications ||--o| application_notes : references
+    application_notes ||--o| interview_feedback : references
+    interview_events ||--o| interview_feedback : references
     scoring_policies ||--o{ scoring_policy_current : references
     jobs ||--o{ job_circular_versions : references
     managed_documents ||--o{ job_circular_versions : references
     jobs ||--o| job_circulars : references
     managed_documents ||--o{ job_circulars : references
     users ||--o{ notifications : references
+    notifications ||--o| interview_notices : references
+    applications ||--o{ interview_notices : references
     cv_versions ||--o| cv_approvals : references
     users o|--o{ cv_approvals : references
+    schema_migrations {
+        INT version PK
+    }
     users {
         BIGINT id PK
         VARCHAR email
@@ -61,6 +72,7 @@ erDiagram
     }
     jobs {
         BIGINT id PK
+        INT vacancy_count
         BIGINT company_id FK
         VARCHAR title
         TEXT description
@@ -70,6 +82,12 @@ erDiagram
         DECIMAL salary_max
         ENUM status
         VARCHAR decision
+    }
+    saved_jobs {
+        BIGINT student_id PK,FK
+        BIGINT job_id PK,FK
+        VARCHAR saved_title
+        TIMESTAMP saved_at
     }
     job_requirements {
         BIGINT job_id PK,FK
@@ -133,6 +151,7 @@ erDiagram
         BIGINT job_id FK
         CHAR cv_version_id FK
         TIMESTAMP submitted_at
+        TIMESTAMP hired_at
         ENUM status
         VARCHAR student_name
         VARCHAR student_email
@@ -142,6 +161,33 @@ erDiagram
         VARCHAR original_policy
         DOUBLE original_score
         MEDIUMTEXT original_explanation
+    }
+    interview_events {
+        CHAR application_id PK,FK
+        INT revision PK
+        ENUM status
+        DATETIME starts_utc
+        DATETIME ends_utc
+        VARCHAR display_zone
+        VARCHAR location
+        DATETIME changed_utc
+        VARCHAR actor
+        VARCHAR reason
+    }
+    application_notes {
+        CHAR application_id PK,FK
+        INT revision
+        VARCHAR notes
+        DATETIME updated_utc
+    }
+    interview_feedback {
+        CHAR application_id PK,FK
+        INT interview_revision FK
+        INT rubric_version
+        TINYINT technical
+        TINYINT communication
+        TINYINT role_fit
+        VARCHAR comments
     }
     scoring_policies {
         VARCHAR version PK
@@ -170,6 +216,21 @@ erDiagram
         VARCHAR message
         TIMESTAMP created_at
         TIMESTAMP read_at
+    }
+    interview_notices {
+        CHAR notice_id PK,FK
+        CHAR application_id FK
+    }
+    admin_activity {
+        BIGINT id PK
+        TIMESTAMP event_at
+        BIGINT admin_id
+        VARCHAR action
+        VARCHAR target_kind
+        VARCHAR target_id
+        VARCHAR outcome
+        BIGINT record_count
+        CHAR operation_id
     }
     cv_approvals {
         CHAR version_id PK,FK

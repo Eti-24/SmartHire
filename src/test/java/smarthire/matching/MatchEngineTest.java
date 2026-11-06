@@ -56,6 +56,22 @@ class MatchEngineTest {
         assertEquals("default-v1", result.policyVersion());
     }
 
+    @Test void checklistKeepsZeroWeightMandatoryAndOptionalEvidenceGapsDistinct() {
+        var requirements = details(requirement(Kind.SKILL, "java", false), requirement(Kind.PROJECT, "java", true),
+                requirement(Kind.DEGREE, "BACHELOR", false), requirement(Kind.FIELD, "software engineering", false),
+                new Requirement(Kind.EXPERIENCE, "", 8, Priority.REQUIRED, true), requirement(Kind.EXPERIENCE_TAG, "java", false));
+        var profile = new Qualifications(List.of("java"), Degree.BACHELOR, "computer science", List.of(), List.of(
+                work("2025-01", "2025-04", List.of("java")), work("2025-03", "2025-06", List.of("java"))), List.of());
+        var result = engine.assess(profile, requirements, vocabulary, new ScoringPolicy("skills-only", Map.of(SKILLS, 100)));
+        assertEquals(100, result.percentage());
+        assertFalse(result.eligible());
+        assertEquals(List.of(Kind.PROJECT, Kind.EXPERIENCE), result.gaps().stream().filter(MatchResult.Gap::mandatory)
+                .map(MatchResult.Gap::kind).toList());
+        assertEquals(List.of(Kind.FIELD), result.gaps().stream().filter(gap -> !gap.mandatory()).map(MatchResult.Gap::kind).toList());
+        assertEquals(6, result.relevantMonths());
+        assertTrue(assess(cv(List.of("java")), requirement(Kind.SKILL, "java", true)).gaps().isEmpty());
+    }
+
     @Test void aliasesResolveExactlyAcrossSkillsProjectsAndWorkWithoutSubstringMatches() {
         var qualifications = new Qualifications(List.of("JS", "Communication skills", "CPP"), null, "",
                 List.of(new Project("Evidence", List.of("ECMAScript"))),

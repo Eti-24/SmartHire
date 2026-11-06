@@ -42,6 +42,17 @@ class CleanDatabaseSmokeTest {
                 try (var documents = new ManagedDocuments(root.resolve("documents"), new JdbcDocumentReferences(database))) {
                     assertTrue(documents.reconcile().unavailableReferences().isEmpty());
                     var jobs = new JobService(identity, new JdbcJobs(database), documents);
+                    var newStudent = identity.login("student.nusrat@smarthire.example", "SmartHireDemo!21".toCharArray());
+                    var visibleSeedJobs = jobs.list(newStudent, "", null);
+                    assertEquals(5, visibleSeedJobs.size());
+                    assertEquals(2, visibleSeedJobs.stream().filter(post -> post.details().title().equals("Junior Java Developer"))
+                            .findFirst().orElseThrow().remainingVacancies());
+                    var businessCompany = identity.login("company.padmabridge@smarthire.example", "SmartHireDemo!21".toCharArray());
+                    var pendingSeed = jobs.list(businessCompany, "", null).stream()
+                            .filter(post -> post.details().title().equals("Junior Reporting Analyst")).findFirst().orElseThrow();
+                    assertEquals(Job.Status.PENDING, pendingSeed.status());
+                    assertThrows(UserError.class, () -> jobs.open(newStudent, pendingSeed.id()));
+                    jobs.moderate(administrator, pendingSeed.id(), false, "Keep this decision during reseeding.");
                     var cvs = new CvService(identity, new JdbcCvs(database), documents);
                     var applications = new ApplicationService(identity, new JdbcApplications(database), documents);
                     var workspace = new WorkspaceService(identity, new JdbcWorkspace(database));
@@ -67,11 +78,15 @@ class CleanDatabaseSmokeTest {
                     // Repeated seeding preserves confirmed reviews, applications, decisions and notifications.
                     DemoSeed.provision(accounts); DemoJobs.provision(database); database.initialize();
                     assertEquals(5, jobs.list(company, "", null).size());
+                    assertEquals(2, jobs.list(businessCompany, "", null).size());
+                    assertEquals(Job.Status.REJECTED, jobs.open(businessCompany, pendingSeed.id()).status());
+                    assertEquals(5, jobs.list(newStudent, "", null).size());
                     assertEquals(Application.Status.HIRED, new ApplicationService(identity, new JdbcApplications(database), documents).open(student, application.id()).application().status());
                     assertArrayEquals(original, applications.download(student, application.id()));
                     assertNotNull(new WorkspaceService(identity, new JdbcWorkspace(database)).notices(student).stream().filter(n -> n.id().equals(notice.id())).findFirst().orElseThrow().readAt());
                     assertEquals(1, workspace.monitor(administrator, new WorkspaceRepository.Filter(job, null, null, null)).size());
                     assertEquals(1, workspace.dashboard(student).applicationStatuses().get("HIRED"));
+                    verifyVacancyUpgrade(database, jobs, company, student, job, application.id());
                 }
                 // Reopen the actual managed store with a fresh reference repository.
                 try (var reopened = new ManagedDocuments(root.resolve("documents"), new JdbcDocumentReferences(database))) { assertTrue(reopened.reconcile().unavailableReferences().isEmpty()); }
@@ -80,6 +95,27 @@ class CleanDatabaseSmokeTest {
                 if (created) { try (var statement = control.createStatement()) { statement.execute("DROP DATABASE " + schema); } }
             }
         }
+    }
+
+    private static void verifyVacancyUpgrade(Database database, JobService jobs, UUID company, UUID student, long job, UUID application) throws Exception {
+        try (var connection = database.connect(); var statement = connection.createStatement()) {
+            statement.execute("DELETE FROM schema_migrations WHERE version=1");
+            statement.execute("ALTER TABLE jobs DROP CHECK job_positive_vacancy_count, DROP COLUMN vacancy_count");
+            statement.execute("ALTER TABLE applications DROP COLUMN hired_at");
+        }
+        database.initialize();
+        try (var connection = database.connect(); var statement = connection.createStatement()) {
+            // Simulate interruption after the first DDL step, before recording the migration.
+            statement.execute("DELETE FROM schema_migrations WHERE version=1");
+            statement.execute("ALTER TABLE applications DROP COLUMN hired_at");
+        }
+        database.initialize();
+        database.initialize();
+        assertEquals(1, jobs.open(company, job).details().vacancyCount());
+        assertEquals(0, jobs.open(company, job).remainingVacancies());
+        assertThrows(UserError.class, () -> jobs.open(student, job));
+        var legacy = jobs.companyHires(company).stream().filter(row -> row.applicationId().equals(application)).findFirst().orElseThrow();
+        assertNull(legacy.hiredAt());
     }
     private static CvProfile confirm(CvService cvs, UUID session, String name) {
         try (var draft = cvs.upload(session, Path.of("src/test/resources/demo", name))) { return cvs.confirm(session, draft, draft.suggestions()); }

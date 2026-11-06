@@ -71,6 +71,8 @@ public final class JdbcCvApprovals implements CvApprovalRepository {
                 query.executeUpdate();
                 var review = find(version).orElseThrow();
                 JdbcNotifications.add(connection, review.cv().studentId(), "CV " + version + " " + a.status().name().toLowerCase(Locale.ROOT) + (a.reason().isBlank() ? "." : ": " + a.reason()));
+                JdbcAdminActivity.add(connection, a.reviewerId(), new smarthire.workspace.AdminActivity.Change(
+                        smarthire.workspace.AdminActivity.Action.CV_DECISION, "CV", version.toString(), a.status().name()));
             } catch (SQLException e) { throw Database.unavailable(); }
         }
     }

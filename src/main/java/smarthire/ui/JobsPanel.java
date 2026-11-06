@@ -1,9 +1,6 @@
 package smarthire.ui;
 
 import java.awt.BorderLayout;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,7 +26,7 @@ public final class JobsPanel extends JPanel {
     private final long initialJobId;
     private final smarthire.applications.ApplicationService applications;
     private final JPanel body = new JPanel(new BorderLayout(10, 10));
-    private final JTextArea message = new JTextArea(3, 40);
+    private final JTextArea message = WorkspaceStyle.message("Loading jobs…");
     private final JButton back = new JButton("Back to overview");
     private boolean busy;
     private List<Category> categories = List.of();
@@ -45,14 +42,22 @@ public final class JobsPanel extends JPanel {
 
     public JobsPanel(JobService service, UUID session, Role role, Runnable onBack, long initialJobId,
             smarthire.applications.ApplicationService applications) {
+        this(service, session, role, onBack, initialJobId, applications,
+                initialJobId == 0 ? "Back to overview" : "Back to matches");
+    }
+
+    JobsPanel(JobService service, UUID session, Role role, Runnable onBack, long initialJobId,
+            smarthire.applications.ApplicationService applications, String backLabel) {
         super(new BorderLayout(10, 10));
         this.service = service; this.session = session; this.role = role;
         this.initialJobId = initialJobId;
         this.applications = applications;
-        if (initialJobId != 0) { back.setText("Back to matches"); }
-        back.addActionListener(event -> onBack.run());
-        add(back, BorderLayout.NORTH); add(body, BorderLayout.CENTER);
-        message.setEditable(false); message.setLineWrap(true); message.setWrapStyleWord(true);
+        back.setText(backLabel);
+        if (onBack != null) {
+            back.addActionListener(event -> onBack.run());
+            add(back, BorderLayout.NORTH);
+        }
+        add(body, BorderLayout.CENTER);
         add(message, BorderLayout.SOUTH);
         load();
     }
@@ -67,23 +72,75 @@ public final class JobsPanel extends JPanel {
 
     private void browse(String query, Long categoryId) {
         work(() -> service.list(session, query, categoryId), jobs -> {
-            body.removeAll();
-            JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            JTextField search = new JTextField(query, 14);
-            JComboBox<Category> category = new JComboBox<>();
+            var controls = WorkspaceStyle.actions();
+            var search = new JTextField(query, 12);
+            var titleLabel = new JLabel("Job title");
+            titleLabel.setLabelFor(search);
+            var category = new JComboBox<Category>();
             category.addItem(new Category(0, "All categories"));
-            for (Category item : categories) { category.addItem(item); if (categoryId != null && item.id() == categoryId) { category.setSelectedItem(item); } }
-            controls.add(new JLabel("Title")); controls.add(search); controls.add(new JLabel("Category")); controls.add(category);
-            button(controls, "Search", () -> browse(search.getText(), ((Category) category.getSelectedItem()).id() == 0 ? null : ((Category) category.getSelectedItem()).id()));
+            category.setPrototypeDisplayValue(new Category(0, "Select a job category"));
+            for (Category item : categories) {
+                category.addItem(item);
+                if (categoryId != null && item.id() == categoryId) { category.setSelectedItem(item); }
+            }
+            var categoryLabel = new JLabel("Category");
+            categoryLabel.setLabelFor(category);
+            Runnable filter = () -> {
+                var selected = (Category) category.getSelectedItem();
+                browse(search.getText(), selected.id() == 0 ? null : selected.id());
+            };
+            search.addActionListener(event -> filter.run());
+            controls.add(titleLabel);
+            controls.add(search);
+            controls.add(categoryLabel);
+            controls.add(category);
+            button(controls, "Search", filter);
             button(controls, "Clear", () -> browse("", null));
-            DefaultTableModel model = readOnly("ID", "Title", "Company", "Category", "Status");
-            for (Job job : jobs) { model.addRow(new Object[]{job.id(), job.details().title(), job.companyName(), categoryName(job.details().categoryId()), job.status()}); }
-            JTable table = new JTable(model); table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION); table.setAutoCreateRowSorter(true);
-            JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            button(actions, "Open selected", () -> selected(table, jobs, job -> work(() -> service.open(session, job.id()), this::details)));
+
+            var model = readOnly("Job", role == Role.COMPANY ? "Category" : "Company", "Status");
+            for (Job job : jobs) {
+                model.addRow(new Object[]{job.details().title(),
+                        role == Role.COMPANY ? categoryName(job.details().categoryId()) : job.companyName(),
+                        WorkspaceStyle.label(job.status())});
+            }
+            var table = new JTable(model);
+            table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            table.setAutoCreateRowSorter(true);
+            table.getAccessibleContext().setAccessibleName("Job postings");
+            table.getColumnModel().getColumn(0).setPreferredWidth(180);
+            WorkspaceStyle.statusColumn(table, 2);
+            var preview = new WorkspaceStyle.Preview();
+            preview.showRecord("No jobs found", "Try a different title or category.");
+            var open = WorkspaceStyle.button("Open job", () -> {
+                var job = WorkspaceStyle.selected(table, jobs);
+                work(() -> service.open(session, job.id()), this::details);
+            });
+            var attach = WorkspaceStyle.button("Attach circular", () -> attachCircular(WorkspaceStyle.selected(table, jobs)));
+            var save = WorkspaceStyle.button("Save job", () -> saveJob(WorkspaceStyle.selected(table, jobs)));
+            open.setEnabled(false);
+            attach.setEnabled(false);
+            save.setEnabled(false);
+            WorkspaceStyle.previewSelection(table, jobs, job -> {
+                open.setEnabled(job != null);
+                save.setEnabled(job != null);
+                attach.setEnabled(job != null && job.status() != Status.CLOSED);
+                if (job == null) { preview.showRecord("Jobs", "Select a posting to preview it."); }
+                else {
+                    var details = job.details();
+                    preview.showRecord(WorkspaceStyle.label(job.status()), details.title() + "\n" + job.companyName()
+                            + "\n\n" + categoryName(details.categoryId()) + " · " + details.location()
+                            + "\nSalary " + details.salaryMin() + "–" + details.salaryMax()
+                            + "\nUnfilled vacancies: " + job.remainingVacancies() + " of " + details.vacancyCount()
+                            + "\nJob #" + job.id() + "\n\n" + details.description());
+                }
+            });
+            var actions = WorkspaceStyle.actions();
+            WorkspaceStyle.primary(open);
+            actions.add(open);
+            if (role == Role.STUDENT) { actions.add(save); }
             if (role == Role.COMPANY) {
                 button(actions, "Create job", () -> editor(null));
-                button(actions, "Attach circular", () -> selected(table, jobs, this::attachCircular));
+                actions.add(attach);
             }
             if (role == Role.ADMIN) {
                 button(actions, "Verify companies", this::companies);
@@ -91,24 +148,35 @@ public final class JobsPanel extends JPanel {
                 button(actions, "Skills", this::skillEditor);
                 button(actions, "Matching weights", this::policyEditor);
             }
-            body.add(controls, BorderLayout.NORTH); body.add(new JScrollPane(table), BorderLayout.CENTER); body.add(actions, BorderLayout.SOUTH);
-            message.setText(jobs.isEmpty() ? "No jobs match these filters. Clear the filters to show all available jobs." : jobs.size() + " job(s). Open a posting to see its requirements.");
+            body.removeAll();
+            body.add(controls, BorderLayout.NORTH);
+            body.add(WorkspaceStyle.split(WorkspaceStyle.table(table), preview), BorderLayout.CENTER);
+            body.add(actions, BorderLayout.SOUTH);
+            message.setText(jobs.isEmpty() ? "No jobs match your search." : jobs.size() + " postings");
             refresh();
         });
     }
 
     private String categoryName(long id) { return categories.stream().filter(c -> c.id() == id).map(Category::name).findFirst().orElse("Unknown"); }
 
+    private void saveJob(Job job) {
+        work(() -> { service.saveBookmark(session, job.id()); return job; }, ignored -> message.setText("Job saved."));
+    }
+
     private void details(Job job) {
-        JPanel panel = form();
         Details d = job.details();
-        JTextArea summary = new JTextArea(d.title() + "\n" + job.companyName() + " · " + categoryName(d.categoryId())
-                + "\n" + d.location() + " · Salary " + d.salaryMin() + "–" + d.salaryMax() + "\nStatus: " + job.status()
-                + "\n" + job.decision() + "\n\n" + d.description(), 9, 40);
-        summary.setEditable(false); summary.setLineWrap(true); summary.setWrapStyleWord(true);
-        panel.add(new JScrollPane(summary));
-        JPanel circularControls = new JPanel(new java.awt.GridLayout(0, 1, 0, 8));
-        circularControls.setBorder(BorderFactory.createTitledBorder("Job circular (optional PDF or DOCX)"));
+        var tabs = new JTabbedPane();
+        String summary = d.title() + "\n" + job.companyName() + " · " + categoryName(d.categoryId())
+                + "\n" + d.location() + " · Salary " + d.salaryMin() + "–" + d.salaryMax()
+                + "\nStatus  ·  " + WorkspaceStyle.label(job.status())
+                + "\nUnfilled vacancies  ·  " + job.remainingVacancies() + " of " + d.vacancyCount()
+                + (job.decision() == null || job.decision().isBlank() ? "" : "\n" + job.decision()) + "\n\n" + d.description();
+        tabs.addTab("Posting", WorkspaceStyle.text(summary));
+        tabs.addTab("Requirements", WorkspaceStyle.table(new JTable(requirementModel(d.requirements(), false))));
+        var circularTab = new JPanel(new BorderLayout(0, 10));
+        WorkspaceStyle.surface(circularTab, 12);
+        circularTab.add(WorkspaceStyle.message("Read the extracted circular text or save the original PDF or DOCX."), BorderLayout.NORTH);
+        var circularControls = WorkspaceStyle.actions();
         if (role == Role.COMPANY) {
             if (job.status() != Status.CLOSED) {
                 button(circularControls, "Attach / replace circular", () -> attachCircular(job));
@@ -125,13 +193,21 @@ public final class JobsPanel extends JPanel {
             var chooser = new JFileChooser(); chooser.setSelectedFile(new java.io.File(circular.orElseThrow().originalName()));
             if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) { return; }
             var destination = chooser.getSelectedFile().toPath();
-            if (java.nio.file.Files.exists(destination) && JOptionPane.showConfirmDialog(this, "Replace the existing file?", "Save circular", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) { return; }
-            work(() -> { var bytes = service.downloadCircular(session, job.id()); java.nio.file.Files.write(destination, bytes); return true; }, ignored -> message.setText("Circular saved."));
+            work(() -> java.nio.file.Files.exists(destination), exists -> {
+                if (exists && JOptionPane.showConfirmDialog(this, "Replace the existing file?", "Save circular",
+                        JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) { return; }
+                work(() -> {
+                    java.nio.file.Files.write(destination, service.downloadCircular(session, job.id()));
+                    return true;
+                }, ignored -> message.setText("Circular saved."));
+            });
         }));
-        panel.add(circularControls);
-        DefaultTableModel requirements = requirementModel(d.requirements(), false);
-        panel.add(new JScrollPane(new JTable(requirements)));
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        var circularBody = new JPanel(new BorderLayout());
+        circularBody.setOpaque(false);
+        circularBody.add(circularControls, BorderLayout.NORTH);
+        circularTab.add(circularBody, BorderLayout.CENTER);
+        tabs.addTab("Job circular", circularTab);
+        var actions = WorkspaceStyle.actions();
         if (role == Role.STUDENT && applications != null) {
             button(actions, "Apply with my reviewed CV", () -> work(() -> applications.apply(session, job.id()),
                     submitted -> message.setText("Application submitted. Track it in My applications.")));
@@ -147,8 +223,13 @@ public final class JobsPanel extends JPanel {
                 if (reason != null) { work(() -> { service.moderate(session, job.id(), false, reason); return true; }, ignored -> browse("", null)); }
             });
         }
-        button(actions, "Back to jobs", () -> browse("", null)); panel.add(actions);
-        show(panel); message.setText("Required priority affects scoring. Only an explicit mandatory flag blocks eligibility.");
+        if (role == Role.STUDENT) { button(actions, "Save job", () -> saveJob(job)); }
+        button(actions, "Back to jobs", () -> browse("", null));
+        body.removeAll();
+        body.add(tabs, BorderLayout.CENTER);
+        body.add(actions, BorderLayout.SOUTH);
+        message.setText("Required priority affects scoring. Only an explicit mandatory flag blocks eligibility.");
+        refresh();
     }
 
     private void attachCircular(Job job) {
@@ -164,7 +245,10 @@ public final class JobsPanel extends JPanel {
     }
 
     private void editor(Job job) {
-        JPanel panel = form(); Details d = job == null ? null : job.details();
+        var posting = WorkspaceStyle.form();
+        var requirements = new JPanel(new BorderLayout(0, 10));
+        WorkspaceStyle.surface(requirements, 12);
+        Details d = job == null ? null : job.details();
         JTextField title = new JTextField(d == null ? "" : d.title());
         JTextArea description = new JTextArea(d == null ? "" : d.description(), 4, 40);
         description.setLineWrap(true); description.setWrapStyleWord(true);
@@ -173,35 +257,48 @@ public final class JobsPanel extends JPanel {
         JTextField location = new JTextField(d == null ? "" : d.location());
         JTextField min = new JTextField(d == null ? "0" : d.salaryMin().toPlainString());
         JTextField max = new JTextField(d == null ? "0" : d.salaryMax().toPlainString());
-        field(panel, "Title", title); field(panel, "Description", new JScrollPane(description)); field(panel, "Category", category);
-        field(panel, "Location", location); field(panel, "Salary minimum", min); field(panel, "Salary maximum", max);
-        panel.add(new JLabel("Requirements: value = skill name, degree level, field or certification; months only for EXPERIENCE."));
-        panel.add(new JLabel("Degree order: SECONDARY < DIPLOMA < BACHELOR < MASTER < DOCTORATE (demo convention)."));
-        panel.add(new JLabel("Positive experience needs EXPERIENCE_TAG rows. Required priority alone is not mandatory."));
+        JTextField vacancies = new JTextField(d == null ? "1" : Integer.toString(d.vacancyCount()));
+        field(posting, "Title", title);
+        field(posting, "Description", new JScrollPane(description));
+        field(posting, "Category", category);
+        field(posting, "Location", location);
+        field(posting, "Salary minimum", min);
+        field(posting, "Salary maximum", max);
+        field(posting, "Number of vacancies", vacancies);
+        var guidance = WorkspaceStyle.message("Use months for experience and add an experience tag for a positive minimum. "
+                + "Degree order is Secondary, Diploma, Bachelor, Master, Doctorate. The Mandatory checkbox controls eligibility.");
+        requirements.add(guidance, BorderLayout.NORTH);
         DefaultTableModel model = requirementModel(d == null ? List.of() : d.requirements(), true);
-        JTable table = new JTable(model); table.setRowHeight(25);
+        JTable table = new JTable(model);
+        table.setSurrendersFocusOnKeystroke(true);
         table.getColumnModel().getColumn(0).setCellEditor(new DefaultCellEditor(new JComboBox<>(Kind.values())));
         JComboBox<String> values = new JComboBox<>(); values.setEditable(true);
         for (Skill skill : skills) { values.addItem(skill.name()); }
         for (Degree degree : Degree.values()) { values.addItem(degree.name()); }
         table.getColumnModel().getColumn(1).setCellEditor(new DefaultCellEditor(values));
         table.getColumnModel().getColumn(3).setCellEditor(new DefaultCellEditor(new JComboBox<>(Priority.values())));
-        JScrollPane grid = new JScrollPane(table); grid.setPreferredSize(new Dimension(700, 180)); panel.add(grid);
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        button(actions, "Suggest from description", () -> {
+        requirements.add(WorkspaceStyle.table(table), BorderLayout.CENTER);
+        var tools = WorkspaceStyle.actions();
+        button(tools, "Suggest from description", () -> {
             if (table.isEditing() && !table.getCellEditor().stopCellEditing()) { return; }
             String source = description.getText(); work(() -> service.suggest(session, source), suggestions -> previewSuggestions(model, suggestions));
         });
         if (job != null) {
-            button(actions, "Suggest from circular", () -> {
+            button(tools, "Suggest from circular", () -> {
                 if (table.isEditing() && !table.getCellEditor().stopCellEditing()) { return; }
                 work(() -> service.suggest(session, service.circular(session, job.id()).orElseThrow(() -> new UserError("Attach a circular from the job details first.")).text()),
                         suggestions -> previewSuggestions(model, suggestions));
             });
         }
-        button(actions, "Add requirement", () -> model.addRow(new Object[]{Kind.SKILL, "", 0, Priority.REQUIRED, false}));
-        button(actions, "Remove row", () -> { if (table.getSelectedRow() >= 0) { model.removeRow(table.getSelectedRow()); } });
-        button(actions, "Submit for approval", () -> {
+        button(tools, "Add requirement", () -> model.addRow(new Object[]{Kind.SKILL, "", 0, Priority.REQUIRED, false}));
+        button(tools, "Remove row", () -> {
+            if ((!table.isEditing() || table.getCellEditor().stopCellEditing()) && table.getSelectedRow() >= 0) {
+                model.removeRow(table.getSelectedRow());
+            }
+        });
+        requirements.add(tools, BorderLayout.SOUTH);
+        var actions = WorkspaceStyle.actions();
+        var submit = WorkspaceStyle.button("Submit for approval", () -> {
             if (table.isEditing() && !table.getCellEditor().stopCellEditing()) { return; }
             try {
                 if (category.getSelectedItem() == null) { throw new UserError("Ask an admin to create a category first."); }
@@ -211,28 +308,40 @@ public final class JobsPanel extends JPanel {
                             Integer.parseInt(String.valueOf(model.getValueAt(row, 2))), (Priority) model.getValueAt(row, 3), (Boolean) model.getValueAt(row, 4)));
                 }
                 Details input = new Details(title.getText(), description.getText(), ((Category) category.getSelectedItem()).id(), location.getText(),
-                        new BigDecimal(min.getText().strip()), new BigDecimal(max.getText().strip()), items);
+                        new BigDecimal(min.getText().strip()), new BigDecimal(max.getText().strip()), items,
+                        Integer.parseInt(vacancies.getText().strip()));
                 work(() -> service.submit(session, job == null ? 0 : job.id(), input), ignored -> browse("", null));
-            } catch (NumberFormatException exception) { message.setText("Enter numeric salary values and whole-number months."); }
+            } catch (NumberFormatException exception) { message.setText("Enter numeric salary values and whole numbers for months and vacancies."); }
             catch (UserError exception) { message.setText(exception.getMessage()); }
         });
-        button(actions, "Cancel", () -> browse("", null)); panel.add(actions); show(panel);
+        WorkspaceStyle.primary(submit);
+        actions.add(submit);
+        button(actions, "Cancel", () -> browse("", null));
+        var tabs = new JTabbedPane();
+        tabs.addTab("Posting information", WorkspaceStyle.scroll(posting));
+        tabs.addTab("Requirements", requirements);
+        body.removeAll();
+        body.add(WorkspaceStyle.heading(job == null ? "Create a job" : "Edit posting"), BorderLayout.NORTH);
+        body.add(tabs, BorderLayout.CENTER);
+        body.add(actions, BorderLayout.SOUTH);
+        refresh();
         message.setText("Saving returns the entire job to pending approval. Add at least one scored requirement.");
     }
 
     private void companies() {
         work(() -> service.companies(session), companies -> {
-            JPanel panel = form(); JComboBox<Company> choice = new JComboBox<>(companies.toArray(Company[]::new));
+            JPanel panel = form("Company verification"); JComboBox<Company> choice = new JComboBox<>(companies.toArray(Company[]::new));
             field(panel, "Company", choice);
             JCheckBox verified = new JCheckBox("Verified company"); panel.add(verified);
             choice.addActionListener(e -> { if (choice.getSelectedItem() instanceof Company c) { verified.setSelected(c.verified()); } });
             if (choice.getSelectedItem() instanceof Company c) { verified.setSelected(c.verified()); }
-            button(panel, "Save verification", () -> {
+            var actions = WorkspaceStyle.actions();
+            primary(actions, "Save verification", () -> {
                 if (choice.getSelectedItem() instanceof Company c) {
                     boolean value = verified.isSelected(); work(() -> { service.verify(session, c.id(), value); return true; }, ignored -> companies());
                 }
             });
-            button(panel, "Back to jobs", () -> browse("", null)); show(panel);
+            button(actions, "Back to jobs", () -> browse("", null)); show(panel, actions);
             message.setText("Removing verification immediately hides this company's jobs from students.");
         });
     }
@@ -263,35 +372,37 @@ public final class JobsPanel extends JPanel {
 
     private void policyEditor() {
         work(() -> service.scoringPolicy(session), policy -> {
-            JPanel panel = form(); panel.add(new JLabel("Current policy: " + policy.version()));
+            JPanel panel = form("Matching weights"); panel.add(new JLabel("Current policy  ·  " + policy.version()));
             var inputs = new java.util.EnumMap<smarthire.matching.ScoringPolicy.Category, JTextField>(smarthire.matching.ScoringPolicy.Category.class);
             for (var category : smarthire.matching.ScoringPolicy.Category.values()) {
                 var input = new JTextField(String.valueOf(policy.weights().getOrDefault(category, 0)));
                 field(panel, category.name().toLowerCase(java.util.Locale.ROOT) + " weight", input); inputs.put(category, input);
             }
-            panel.add(new JLabel("Weights are normalized for each job's active categories. Original application scores stay unchanged."));
-            button(panel, "Activate weights", () -> {
+            panel.add(WorkspaceStyle.message("Weights are normalized for each job’s active categories. Original application scores stay unchanged."));
+            var actions = WorkspaceStyle.actions();
+            primary(actions, "Activate weights", () -> {
                 try {
                     var weights = new java.util.EnumMap<smarthire.matching.ScoringPolicy.Category, Integer>(smarthire.matching.ScoringPolicy.Category.class);
                     inputs.forEach((category, input) -> weights.put(category, Integer.parseInt(input.getText().strip())));
                     work(() -> service.activatePolicy(session, weights), activated -> { policyEditor(); message.setText("Policy activated. Matches and applicant rankings recalculate on refresh."); });
                 } catch (NumberFormatException e) { message.setText("Enter nonnegative whole-number weights with a positive total."); }
             });
-            button(panel, "Back to jobs", () -> browse("", null)); show(panel);
+            button(actions, "Back to jobs", () -> browse("", null)); show(panel, actions);
             message.setText("Activation checks all approved open jobs and all jobs with applications, including closed postings.");
         });
     }
 
     private void categoryEditor() {
-        JPanel panel = form(); JComboBox<Category> choice = new JComboBox<>(); choice.addItem(new Category(0, "New category")); categories.forEach(choice::addItem);
+        JPanel panel = form("Job categories"); JComboBox<Category> choice = new JComboBox<>(); choice.addItem(new Category(0, "New category")); categories.forEach(choice::addItem);
         JTextField name = new JTextField(); field(panel, "Category", choice); field(panel, "Name", name);
         choice.addActionListener(e -> name.setText(((Category) choice.getSelectedItem()).id() == 0 ? "" : ((Category) choice.getSelectedItem()).name()));
-        button(panel, "Save category", () -> { long id = ((Category) choice.getSelectedItem()).id(); String value = name.getText(); work(() -> service.saveCategory(session, id, value), ignored -> load()); });
-        button(panel, "Back to jobs", () -> browse("", null)); show(panel);
+        var actions = WorkspaceStyle.actions();
+        primary(actions, "Save category", () -> { long id = ((Category) choice.getSelectedItem()).id(); String value = name.getText(); work(() -> service.saveCategory(session, id, value), ignored -> load()); });
+        button(actions, "Back to jobs", () -> browse("", null)); show(panel, actions);
     }
 
     private void skillEditor() {
-        JPanel panel = form(); JComboBox<String> choice = new JComboBox<>(); choice.addItem("New skill"); skills.forEach(s -> choice.addItem(s.id()));
+        JPanel panel = form("Skills and aliases"); JComboBox<String> choice = new JComboBox<>(); choice.addItem("New skill"); skills.forEach(s -> choice.addItem(s.id()));
         JTextField id = new JTextField(), name = new JTextField(), aliases = new JTextField();
         JComboBox<Skill.Type> type = new JComboBox<>(Skill.Type.values());
         field(panel, "Skill", choice); field(panel, "Stable ID (lowercase, hyphens allowed)", id); field(panel, "Display name", name);
@@ -301,14 +412,15 @@ public final class JobsPanel extends JPanel {
             id.setEditable(selected == null); id.setText(selected == null ? "" : selected.id()); name.setText(selected == null ? "" : selected.name());
             aliases.setText(selected == null ? "" : String.join(", ", selected.aliases())); type.setSelectedItem(selected == null ? Skill.Type.TECHNICAL : selected.type());
         });
-        button(panel, "Save skill", () -> {
+        var actions = WorkspaceStyle.actions();
+        primary(actions, "Save skill", () -> {
             try {
                 Skill skill = new Skill(id.getText().strip(), name.getText(), (Skill.Type) type.getSelectedItem(),
                         aliases.getText().isBlank() ? Set.of() : Set.copyOf(Arrays.stream(aliases.getText().split(",", -1)).map(String::strip).toList()));
                 work(() -> { service.saveSkill(session, skill); return true; }, ignored -> load());
             } catch (IllegalArgumentException exception) { message.setText(exception.getMessage()); }
         });
-        button(panel, "Back to jobs", () -> browse("", null)); show(panel);
+        button(actions, "Back to jobs", () -> browse("", null)); show(panel, actions);
         message.setText("Canonical IDs stay stable when names or aliases change. Existing requirements retain those IDs.");
     }
 
@@ -327,24 +439,44 @@ public final class JobsPanel extends JPanel {
         };
     }
     private static DefaultTableModel readOnly(String... columns) { return new DefaultTableModel(columns, 0) { @Override public boolean isCellEditable(int r, int c) { return false; } }; }
-    private void selected(JTable table, List<Job> jobs, Consumer<Job> action) { if (table.getSelectedRow() < 0) { message.setText("Select a job first."); } else { action.accept(jobs.get(table.convertRowIndexToModel(table.getSelectedRow()))); } }
-    private static JPanel form() { JPanel p = new JPanel(); p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS)); return p; }
-    private static void field(JPanel p, String label, JComponent input) { JLabel caption = new JLabel(label); caption.setLabelFor(input); p.add(caption); input.setMaximumSize(new Dimension(Integer.MAX_VALUE, input instanceof JScrollPane ? 100 : 30)); p.add(input); p.add(Box.createVerticalStrut(8)); }
-    private static void button(JPanel p, String label, Runnable action) { JButton b = new JButton(label); b.addActionListener(e -> action.run()); p.add(b); }
-    private void show(JPanel panel) { body.removeAll(); body.add(new JScrollPane(panel)); refresh(); }
+    private static JPanel form(String title) {
+        var panel = WorkspaceStyle.form();
+        panel.add(WorkspaceStyle.heading(title));
+        panel.add(Box.createVerticalStrut(10));
+        return panel;
+    }
+
+    private static void field(JPanel panel, String label, JComponent input) { WorkspaceStyle.field(panel, label, input); }
+    private static void button(JPanel panel, String label, Runnable action) { panel.add(WorkspaceStyle.button(label, action)); }
+    private static void primary(JPanel panel, String label, Runnable action) {
+        var button = WorkspaceStyle.button(label, action);
+        WorkspaceStyle.primary(button);
+        panel.add(button);
+    }
+
+    private void show(JPanel panel, JPanel actions) {
+        body.removeAll();
+        body.add(WorkspaceStyle.scroll(panel), BorderLayout.CENTER);
+        body.add(actions, BorderLayout.SOUTH);
+        refresh();
+    }
     private void refresh() { revalidate(); repaint(); }
     private <T> void work(Callable<T> task, Consumer<T> success) {
-        if (busy) { return; } busy = true; enable(this, false); message.setText("Working…");
+        if (busy) { return; }
+        busy = true;
+        Runnable restore = WorkspaceStyle.disable(body);
+        message.setText("Working…");
         new SwingWorker<T, Void>() {
             @Override protected T doInBackground() throws Exception { return task.call(); }
             @Override protected void done() {
-                busy = false; enable(JobsPanel.this, true);
-                try { T result = get(); message.setText("Ready"); success.accept(result); }
+                busy = false;
+                if (!isDisplayable()) { return; }
+                restore.run();
+                try { T result = get(); message.setText(""); success.accept(result); }
                 catch (InterruptedException e) { Thread.currentThread().interrupt(); message.setText("Interrupted. Try again."); }
                 catch (java.util.concurrent.ExecutionException e) { message.setText(e.getCause() instanceof UserError ? e.getCause().getMessage() : "The operation failed. Check the database and try again."); }
             }
         }.execute();
     }
-    private static void enable(Component c, boolean enabled) { c.setEnabled(enabled); if (c instanceof java.awt.Container container) { for (Component child : container.getComponents()) { enable(child, enabled); } } }
     private record Catalog(List<Category> categories, List<Skill> skills) { }
 }

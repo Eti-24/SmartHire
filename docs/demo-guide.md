@@ -2,9 +2,9 @@
 
 ## Start
 
-From the project root in PowerShell 7, start MySQL with `scripts/start-mysql.ps1`, then run `scripts/run.ps1 -SeedDemo`. This explicit additive seed creates three fictional accounts, shared skills/categories and four jobs if the demo company has no jobs. It never resets existing passwords, profiles, CVs, applications or decisions. Then run `scripts/run.ps1` to open the app. Close an older instance first.
+Follow the [README](../README.md) to configure MySQL, seed the demo and launch SmartHire from the release ZIP or source. On a fresh database, the seed creates eight fictional accounts and eight postings, plus shared skills and categories. It preserves existing passwords, profiles, CVs, applications and decisions. Close an older instance before launching.
 
-The accounts and public demo password are in README.md. Use an ordinary account registration for additional fictional students. Use a fresh posting when repeating the demo; one student cannot apply to the same job twice, even after withdrawal. The app has no destructive reset button. A disposable fresh-database run is available through `scripts/verify.ps1 -CleanDatabaseSmoke -Offline`; it never resets `smarthire` or `smarthire_test`.
+The [demo accounts list](../demo%20data/Demo%20accounts.md) has the sign-in details and sample CVs. Use an ordinary account registration for additional fictional students. Use a fresh posting when repeating the demo. One student can apply to a given job once, including after a withdrawal. A disposable fresh-database run is available through `scripts/verify.ps1 -CleanDatabaseSmoke -Offline`.
 
 ## Prepare the assessment posting
 
@@ -36,7 +36,7 @@ Use My CV to upload each sample below, inspect the extracted text, confirm the s
 
 Each sample has Bachelor in Computer Science. Only skills and education are active in this posting, so their weights redistribute to 2/3 and 1/3. Exact fractions are 19/21, 3/7 and 1. Similarity percentages vary with the other job's description and never alter these scores or eligibility.
 
-1. Confirm the mandatory-gap sample. It starts Pending; an Apply attempt must refuse pending approval. Sign in as admin → CV review → Review selected CV → inspect its original/qualifications → Approve this CV version. Return as student to Job matches → Why this match? Show the simple explanation and failed Java check despite 90.48%. Open selected job and attempt to apply; it must still refuse for the missing mandatory skill without creating an application.
+1. Confirm the mandatory-gap sample. It starts Pending; an Apply attempt must refuse pending approval. Sign in as admin → CV review → Review CV version → inspect its original/qualifications → Approve this version. Return as student to Job matches → Why this match? Show the simple explanation and failed Java check despite 90.48%. Open selected job and attempt to apply; it must still refuse for the missing mandatory skill without creating an application.
 2. Replace with the skill-gap sample. Refresh matches to show 42.86%, eligibility and the SQL/communication/teamwork gaps. Ctrl-select two visible jobs and choose Compare two jobs. Explain that similarity is separate from the structured score.
 3. Replace with the eligible sample, confirm and obtain admin approval of this new version through CV review, then apply to the controlled posting. Each confirmed replacement or edited review needs its own approval. Open My applications and note the saved original score and policy.
 4. Replace the current CV with the skill-gap sample again and edit the student's contact profile. Existing application contact details, original assessment, submitted qualifications and downloaded original must remain unchanged.
@@ -44,10 +44,18 @@ Each sample has Bachelor in Computer Science. Only skills and education are acti
 ## Company and admin journey
 
 1. As company, open Applicants, filter by the posting ID, inspect the immutable submitted qualifications and original assessment, and save the submitted CV. Its bytes must be the eligible sample even though the student replaced the current review.
-2. Shortlist, then hire the application. Verify that further decision/withdrawal buttons are unavailable. The job cannot be edited or have its circular replaced after any application. Close it when finished; student application history remains available.
+2. Shortlist, then hire the application. Verify that further decision/withdrawal buttons are unavailable on the hired application. Open **Hiring history** as company to see the hire and its application link. As student, verify that the one-vacancy posting appears in **Hiring history** and disappears from **Find jobs** and **Job matches** when reopened. The student's own outcome remains in **My applications**.
 3. As student/company, read the matching saved alerts in Notifications. Mark one read, sign out/restart and confirm the read state stays saved. The role overview shows relevant counts and the application-status chart; choose Overview or Refresh to reload current data.
 4. As admin, open Application monitoring, combine job/company/student IDs and status filters, and view the original assessment. This view cannot change recruiter decisions. Use Accounts to disable a fictional student/company and demonstrate blocked login/actions, then enable it again. Do not disable a participant until its journey is finished unless intentionally demonstrating this failure.
 5. As admin, change valid matching weights and show that current recommendation/ranking labels use the new version while original submission scores remain saved. To demonstrate two different original policies on one posting, use two fictional student accounts and submit the second before closing the posting. See acceptance-slice-05b.md for the precise sequence.
+
+## Feature expansion walkthrough
+
+1. In **Find jobs**, select a posting and choose **Save job**. Open **Saved jobs** and check that it can be opened or removed. After the posting fills, refresh to see **Filled**. If the student already applied, **View application** opens their retained submission.
+2. In **Job matches**, open **Why this match?** and choose **What to improve**. Compare the mandatory-gap sample with the eligible skill-gap sample. Open **My CV** from the dialog and use its back action to refresh recommendations.
+3. On a shortlisted fictional application, use the company **Interview** tab to propose a future time. Sign in as the student, open **Interviews**, accept, and request another time. Confirm the replacement. In the company **Feedback** tab, save a private note. A scorecard becomes available after a confirmed interview ends.
+4. Publish a fresh job with two vacancies and submit two eligible fictional applications. Hire one and check that the job stays visible to students. Hire the second and check that it leaves discovery and enters student Hiring history. Company Hiring history shows both hires.
+5. In admin **Activity log**, filter for a job moderation, a CV decision, or a data export. Use fictional records for any erase demonstration. The log retains the erase outcome after the target disappears from Data management.
 
 ## Failures to demonstrate safely
 
