@@ -1,15 +1,15 @@
 # SmartHire
 
-SmartHire is a desktop recruitment app built with Java 21, Swing, and MySQL. Students upload CVs, see how their qualifications match a job, save postings, and track applications and interviews. Companies publish vacancies, review applicants, and record interview feedback and hiring decisions. Administrators review companies, postings, and CV versions.
+SmartHire is a Java Swing app for student recruitment. Students upload a CV, compare and save jobs, and track their applications and interviews. Companies post jobs, review applications, and record interview feedback and hiring decisions. Admins approve companies, jobs, and CV versions.
 
-A match score shows how each qualification contributes. Mandatory requirements determine eligibility. Each application keeps a snapshot of the submitted CV, contact details, and assessment.
+Open a match to see which qualifications raised the score and which mandatory requirements are still missing. When a student applies, SmartHire saves the CV version, contact details, and match result with the application.
 
 ## Run the Windows release
 
 1. Install [Java 21](https://adoptium.net/temurin/releases/?version=21) and [MySQL Community Server 8.4 LTS](https://dev.mysql.com/downloads/mysql/8.4.html).
 2. Download and extract the Windows ZIP from [GitHub Releases](https://github.com/Eti-24/SmartHire/releases).
 3. Follow the [Windows setup guide](docs/windows-release.md) to create the local database and configure its application user. The ZIP includes a copy of the guide.
-4. Open PowerShell in the extracted folder. Run the first command once to populate the fictional demo, then use the second command to open the app.
+4. Open PowerShell in the extracted folder. Run the first command to load the sample accounts and jobs. The second opens SmartHire.
 
 ```powershell
 .\SmartHire.cmd --seed-demo
@@ -28,7 +28,9 @@ The seed creates eight fictional accounts, eight job postings, and shared catego
 | Company | `company@smarthire.example` |
 | Admin | `admin@smarthire.example` |
 
-See the [demo accounts and sample CVs](demo%20data/Demo%20accounts.md), the [sample job circular](output/pdf/demo-job-circular.pdf), and the [guided walkthrough](docs/demo-guide.md). To try a submission, upload a sample under **My CV**, confirm the reviewed qualifications, approve that CV version from the admin's **CV review** screen, then apply as the student to an eligible posting. Repeating the seed preserves existing records.
+To try an application, sign in as a student and upload a [sample CV](demo%20data/Demo%20accounts.md) under **My CV**. Confirm the qualifications, switch to the admin account, and approve that version under **CV review**. Sign back in as the student and apply to a job you're eligible for.
+
+The [demo walkthrough](docs/demo-guide.md) gives an example job and the scores to expect from each CV. Use the [sample job circular](output/pdf/demo-job-circular.pdf) if you want to try an upload as a company. You can run the seed again without clearing the records already in MySQL.
 
 ## Build and run from source
 
