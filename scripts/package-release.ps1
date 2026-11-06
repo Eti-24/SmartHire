@@ -15,7 +15,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
 
     Copy-Item "target/smarthire-$version.jar" (Join-Path $bundle 'smarthire.jar')
-    Copy-Item scripts/SmartHire.cmd $bundle
+    Copy-Item scripts/SmartHire.cmd,scripts/SmartHire-Cloud.cmd,scripts/aiven.properties.example $bundle
     Copy-Item docs/windows-release.md (Join-Path $bundle 'README.md')
     Copy-Item -Recurse -LiteralPath 'demo data' -Destination (Join-Path $bundle 'demo data')
     Copy-Item output/pdf/demo-job-circular.pdf (Join-Path $bundle 'demo data')

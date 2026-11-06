@@ -33,12 +33,15 @@ public final class Database {
         try (var input = Files.newInputStream(file)) {
             config.load(input);
         } catch (IOException exception) {
-            throw new UserError("Database configuration is missing or unreadable. Run scripts/run.ps1 from the project folder.");
+            throw new UserError("Database configuration is missing or unreadable. Check " + file + " and follow the setup guide.");
         }
         Properties credentials = new Properties();
         credentials.setProperty("user", config.getProperty("user", ""));
         credentials.setProperty("password", config.getProperty("password", ""));
         String remoteUrl = config.getProperty("jdbcUrl");
+        if (allowRemote && remoteUrl == null && Boolean.getBoolean("smarthire.requireCloud")) {
+            throw new UserError("Set jdbcUrl in the cloud database configuration.");
+        }
         if (allowRemote && remoteUrl != null) {
             String trustStore = config.getProperty("trustStore");
             if (!remoteUrl.matches("jdbc:mysql://[a-zA-Z0-9.-]+:[0-9]{1,5}/[a-zA-Z0-9_]+")

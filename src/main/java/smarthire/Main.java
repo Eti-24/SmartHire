@@ -1,6 +1,7 @@
 package smarthire;
 
 import java.nio.file.Path;
+import java.sql.SQLException;
 import javax.swing.SwingUtilities;
 import smarthire.identity.IdentityService;
 import smarthire.identity.UserError;
@@ -28,6 +29,10 @@ public final class Main {
 
     public static void main(String[] args) {
         Path config = Path.of(System.getProperty("smarthire.config", ".local/application.properties"));
+        if (args.length == 1 && args[0].equals("--check-database")) {
+            checkDatabase(config);
+            return;
+        }
         if (args.length == 1 && args[0].equals("--seed-demo")) {
             try {
                 Database database = Database.load(config, false);
@@ -60,5 +65,20 @@ public final class Main {
                     identity -> new smarthire.workspace.WorkspaceService(identity, new smarthire.storage.JdbcWorkspace(Database.load(config, false)), documents),
                     identity -> new smarthire.cv.CvApprovalService(identity, new smarthire.storage.JdbcCvApprovals(Database.load(config, false)), documents));
         });
+    }
+
+    private static void checkDatabase(Path config) {
+        try {
+            Database database = Database.load(config, false);
+            try (var connection = database.connect()) {
+                if (!connection.isValid(5)) { throw Database.unavailable(); }
+            } catch (SQLException exception) {
+                throw Database.unavailable();
+            }
+            System.out.println(database.isCloud() ? "Cloud MySQL connection verified." : "Local MySQL connection verified.");
+        } catch (UserError exception) {
+            System.err.println(exception.getMessage());
+            System.exit(1);
+        }
     }
 }
