@@ -4,19 +4,18 @@ SmartHire is a Java Swing app for student recruitment. Students upload a CV, com
 
 Open a match to see which qualifications raised the score and which mandatory requirements are still missing. When a student applies, SmartHire saves the CV version, contact details, and match result with the application.
 
-## Run the Windows release
+## Run the Windows release with Aiven
 
-1. Install [Java 21](https://adoptium.net/temurin/releases/?version=21) and [MySQL Community Server 8.4 LTS](https://dev.mysql.com/downloads/mysql/8.4.html).
-2. Download and extract the Windows ZIP from [GitHub Releases](https://github.com/Eti-24/SmartHire/releases).
-3. Follow the [Windows setup guide](docs/windows-release.md) to create the local database and configure its application user. The ZIP includes a copy of the guide.
-4. Open PowerShell in the extracted folder. Run the first command to load the sample accounts and jobs. The second opens SmartHire.
+1. Install the [Java 21 JDK](https://adoptium.net/temurin/releases/?version=21) and extract the Windows ZIP from [GitHub Releases](https://github.com/Eti-24/SmartHire/releases).
+2. Follow [Connect to Aiven](docs/windows-release.md#connect-to-aiven) to add your connection settings and CA certificate. The ZIP includes the same instructions.
+3. Open PowerShell in the extracted folder. Check the connection, then launch the app.
 
 ```powershell
-.\SmartHire.cmd --seed-demo
-.\SmartHire.cmd
+.\SmartHire-Cloud.cmd --check-database
+.\SmartHire-Cloud.cmd
 ```
 
-The release includes the app's Java libraries. GitHub requires an account with access to this private repository to download it.
+The cloud launcher needs Java and access to the Aiven service. The ZIP also supports [local MySQL](docs/windows-release.md#use-local-mysql) through `SmartHire.cmd`. Sign in to GitHub with an account that has access to this private repository to download it.
 
 ## Try the demo
 
@@ -32,21 +31,25 @@ To try an application, sign in as a student and upload a [sample CV](demo%20data
 
 The [demo walkthrough](docs/demo-guide.md) gives an example job and the scores to expect from each CV. Use the [sample job circular](output/pdf/demo-job-circular.pdf) if you want to try an upload as a company. You can run the seed again without clearing the records already in MySQL.
 
-## Build and run from source
+## Set up the project locally
 
-Install the same Java and MySQL prerequisites, plus [Apache Maven](https://maven.apache.org/install.html) and [Git](https://git-scm.com/downloads). Check `java -version` and `mvn -version` in a new PowerShell window. NetBeans and MySQL Workbench are optional.
+On Windows x64, install [Git](https://git-scm.com/downloads) and [PowerShell 7](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows). MySQL also needs the [Microsoft Visual C++ x64 Redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist). Open PowerShell 7 and run these commands.
 
 ```powershell
-git clone https://github.com/Eti-24/SmartHire.git
+git clone --branch v0.1.1 https://github.com/Eti-24/SmartHire.git
 Set-Location SmartHire
+.\scripts\setup-local.ps1 -SeedDemo
+.\scripts\run.ps1
 ```
 
-Complete [Configure MySQL](docs/windows-release.md#configure-mysql) in the checkout. Then build, seed, and run from the project root.
+The setup script prints each step. It installs portable Java 21, Maven, and MySQL under `.tools`, configures and starts MySQL on port `3306`, and builds the app. `-SeedDemo` loads the sample accounts and jobs. You can rerun setup with the same database. If another MySQL server already uses port `3306`, use the manual setup below.
+
+After a restart, run `.\scripts\start-mysql.ps1` before opening the app. To use an existing Java, [Maven](https://maven.apache.org/install.html), and MySQL installation, follow [Configure MySQL](docs/windows-release.md#configure-mysql) in the checkout, then build and run from the project root.
 
 ```powershell
 mvn package dependency:copy-dependencies '-DincludeScope=runtime'
-java -cp 'target/smarthire-0.1.0.jar;target/dependency/*' smarthire.Main --seed-demo
-java -cp 'target/smarthire-0.1.0.jar;target/dependency/*' smarthire.Main
+java -cp 'target/classes;target/dependency/*' smarthire.Main --seed-demo
+java -cp 'target/classes;target/dependency/*' smarthire.Main
 ```
 
 Maven downloads dependencies on the first build. To build the Windows ZIP, run `pwsh -File scripts/package-release.ps1` with Java and Maven on `PATH`. The ZIP is written to `target`.

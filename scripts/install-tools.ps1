@@ -1,3 +1,6 @@
+#Requires -Version 7.0
+param([switch]$RuntimeOnly)
+
 $ErrorActionPreference = 'Stop'
 $toolRoot = Join-Path (Split-Path $PSScriptRoot -Parent) '.tools'
 $downloads = Join-Path $toolRoot 'downloads'
@@ -7,10 +10,14 @@ $jdk = (Invoke-RestMethod 'https://api.adoptium.net/v3/assets/latest/21/hotspot?
 $items = @(
     @{ Name = $jdk.name; Url = $jdk.link; Algorithm = 'SHA256'; Hash = $jdk.checksum },
     @{ Name = 'apache-maven-3.10.0-bin.zip'; Url = 'https://dlcdn.apache.org/maven/maven-3/3.10.0/binaries/apache-maven-3.10.0-bin.zip'; Algorithm = 'SHA512'; HashUrl = 'https://downloads.apache.org/maven/maven-3/3.10.0/binaries/apache-maven-3.10.0-bin.zip.sha512' },
-    @{ Name = 'netbeans-31-bin.zip'; Url = 'https://dlcdn.apache.org/netbeans/netbeans/31/netbeans-31-bin.zip'; Algorithm = 'SHA512'; HashUrl = 'https://downloads.apache.org/netbeans/netbeans/31/netbeans-31-bin.zip.sha512' },
-    @{ Name = 'mysql-8.4.13-winx64.zip'; Url = 'https://cdn.mysql.com/Downloads/MySQL-8.4/mysql-8.4.13-winx64.zip'; Algorithm = 'MD5'; Hash = '7b94489d5524dea9b27097068bea25a8' },
-    @{ Name = 'mysql-workbench-26.10.0-winx64.msi'; Url = 'https://cdn.mysql.com/Downloads/MySQLGUITools/mysql-workbench-26.10.0-winx64.msi'; Algorithm = 'MD5'; Hash = '1987bb5a22f37d4603d651fb290c951d' }
+    @{ Name = 'mysql-8.4.13-winx64.zip'; Url = 'https://cdn.mysql.com/Downloads/MySQL-8.4/mysql-8.4.13-winx64.zip'; Algorithm = 'MD5'; Hash = '7b94489d5524dea9b27097068bea25a8' }
 )
+if (-not $RuntimeOnly) {
+    $items += @(
+        @{ Name = 'netbeans-31-bin.zip'; Url = 'https://dlcdn.apache.org/netbeans/netbeans/31/netbeans-31-bin.zip'; Algorithm = 'SHA512'; HashUrl = 'https://downloads.apache.org/netbeans/netbeans/31/netbeans-31-bin.zip.sha512' },
+        @{ Name = 'mysql-workbench-26.10.0-winx64.msi'; Url = 'https://cdn.mysql.com/Downloads/MySQLGUITools/mysql-workbench-26.10.0-winx64.msi'; Algorithm = 'MD5'; Hash = '1987bb5a22f37d4603d651fb290c951d' }
+    )
+}
 foreach ($item in $items) {
     if ($item.HashUrl) {
         $response = Invoke-WebRequest $item.HashUrl
@@ -44,10 +51,19 @@ foreach ($item in $items | Where-Object { $_.Name -like '*.zip' }) {
         'netbeans*' { 'netbeans' }
         'mysql-*' { 'mysql-8.4.13-winx64' }
     }
-    if (-not (Get-ChildItem -LiteralPath $toolRoot -Directory -Filter $expected)) {
+    $binary = switch -Wildcard ($item.Name) {
+        'OpenJDK*' { 'bin/javac.exe' }
+        'apache-maven*' { 'bin/mvn.cmd' }
+        'netbeans*' { 'bin/netbeans64.exe' }
+        'mysql-*' { 'bin/mysqld.exe' }
+    }
+    $installed = Get-ChildItem -LiteralPath $toolRoot -Directory -Filter $expected |
+        Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName $binary) -PathType Leaf }
+    if (-not $installed) {
         Write-Output "Extracting $($item.Name)"
         & tar.exe -xf $archive -C $toolRoot
         if ($LASTEXITCODE -ne 0) { throw "Extraction failed: $($item.Name)" }
     }
 }
-Write-Output "Archives installed under $toolRoot. Workbench MSI is downloaded and verified; installation is a separate step."
+Write-Output "Tools installed under $toolRoot."
+if (-not $RuntimeOnly) { Write-Output 'The Workbench MSI is ready to install separately.' }

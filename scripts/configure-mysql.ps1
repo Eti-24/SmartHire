@@ -21,8 +21,8 @@ $dataPath = $data.Replace('\', '/')
 $logPath = (Join-Path $local 'mysql-error.log').Replace('\', '/')
 @"
 [mysqld]
-basedir=$base
-datadir=$dataPath
+basedir="$base"
+datadir="$dataPath"
 port=3306
 bind-address=127.0.0.1
 mysqlx=0
@@ -30,7 +30,7 @@ innodb-buffer-pool-size=128M
 max-connections=20
 performance-schema=OFF
 character-set-server=utf8mb4
-log-error=$logPath
+log-error="$logPath"
 
 [client]
 host=127.0.0.1
@@ -66,11 +66,11 @@ GRANT ALL PRIVILEGES ON smarthire_test.* TO 'smarthire'@'localhost';
 "@ | Set-Content -LiteralPath $initFile -Encoding utf8NoBOM
 & $server "--defaults-file=$config" --initialize-insecure
 if ($LASTEXITCODE -ne 0) { throw 'Database initialization failed. Inspect .local/mysql-error.log; existing files were retained.' }
-Start-Process -FilePath $server -ArgumentList @("--defaults-file=$config", "--init-file=$($initFile.Replace('\', '/'))") -WindowStyle Hidden
+Start-Process -FilePath $server -ArgumentList @("--defaults-file=`"$config`"", "--init-file=`"$($initFile.Replace('\', '/'))`"") -WindowStyle Hidden
 $ready = $false
 for ($attempt=0; $attempt -lt 30; $attempt++) {
     Start-Sleep -Seconds 1
-    & mysqladmin "--defaults-extra-file=$adminConfig" --connect-timeout=2 ping 2>$null
+    & mysql "--defaults-extra-file=$adminConfig" --connect-timeout=2 --batch --execute='SELECT 1' *> $null
     if ($LASTEXITCODE -eq 0) { $ready=$true; break }
 }
 if (-not $ready) { throw 'First startup failed; inspect .local/mysql-error.log. Initialization files retained for recovery.' }

@@ -1,10 +1,38 @@
 # SmartHire for Windows
 
-## Install the prerequisites
+Install the [Java 21 JDK](https://adoptium.net/temurin/releases/?version=21) and add its `bin` directory to `PATH`. Open a new PowerShell window and run `java -version` to check it. Extract the entire ZIP into a folder you can write to. The ZIP includes the app, Java libraries, and demo files.
 
-1. Install [Java 21](https://adoptium.net/temurin/releases/?version=21) for Windows and add its `bin` directory to `PATH`. Open a new terminal and confirm `java -version` reports Java 21.
-2. Install [MySQL Community Server 8.4 LTS](https://dev.mysql.com/downloads/mysql/8.4.html). Configure it to listen locally on TCP port `3306`, set an administrator password during installation, and start the MySQL service. You can run the SQL below in the MySQL client or [MySQL Workbench](https://dev.mysql.com/downloads/workbench/).
-3. Extract the entire SmartHire ZIP into a folder you can write to. The ZIP includes the app, Java libraries, and fictional demo files. Maven is only needed when building from source.
+## Connect to Aiven
+
+If you already run SmartHire from source with Aiven, copy `aiven.properties` and `aiven-truststore.p12` from the checkout's `.local` folder to the ZIP's `.local` folder and go to step 4.
+
+1. Open your MySQL service in the Aiven Console. Copy the host, port, database name, username, and password from the connection details. Download the [project CA certificate](https://aiven.io/docs/platform/concepts/tls-ssl-certificates).
+2. From PowerShell in the extracted folder, create the private configuration file from the example. Save the downloaded certificate as `.local/aiven-ca.pem`.
+
+   ```powershell
+   New-Item -ItemType Directory -Force .local
+   if (!(Test-Path .local/aiven.properties)) {
+       Copy-Item aiven.properties.example .local/aiven.properties
+   }
+   keytool -importcert -alias aiven-project-ca -file .local/aiven-ca.pem -keystore .local/aiven-truststore.p12 -storetype PKCS12 -storepass changeit
+   ```
+
+   When `keytool` prompts you to trust the certificate, check that it matches the CA downloaded from Aiven and enter `yes`.
+3. Edit `.local/aiven.properties`. Fill in `jdbcUrl` as `jdbc:mysql://HOST:PORT/DATABASE` and put the username and password on their own lines. Keep this file private.
+4. Check the connection, then open SmartHire.
+
+   ```powershell
+   .\SmartHire-Cloud.cmd --check-database
+   .\SmartHire-Cloud.cmd
+   ```
+
+SmartHire checks the server certificate and hostname. Uploaded CVs and circulars stay in `.local/aiven-documents` on this computer. Back up that folder with the cloud database. A second computer can connect to the same database, but needs a copy of that folder to open the original documents.
+
+Use your cloud SmartHire sign-in. To seed a fresh Aiven database, create `.local/aiven-demo-accounts.properties` with separate `adminPassword` and `demoPassword` values, each at least 16 characters. Run `.\SmartHire-Cloud.cmd --seed-demo`. The admin uses `adminPassword`; fictional students and companies use `demoPassword`.
+
+## Use local MySQL
+
+Install [MySQL Community Server 8.4 LTS](https://dev.mysql.com/downloads/mysql/8.4.html). Set an administrator password, configure local TCP port `3306`, and start the MySQL service. Run the SQL below in the MySQL client or [MySQL Workbench](https://dev.mysql.com/downloads/workbench/).
 
 ## Configure MySQL
 
@@ -28,7 +56,7 @@ SmartHire creates its tables on first startup. It stores original uploaded CVs a
 
 ## Seed the demo and launch
 
-Open PowerShell in the extracted folder and run:
+Open PowerShell in the extracted folder and run these commands.
 
 ```powershell
 .\SmartHire.cmd --seed-demo
