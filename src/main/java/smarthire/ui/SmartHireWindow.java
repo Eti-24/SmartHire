@@ -154,8 +154,9 @@ public final class SmartHireWindow extends JFrame {
         field(form, "Password", password);
         JButton signIn = new JButton("Sign in");
         JButton register = new JButton("Create an account");
-        form.add(formActions(signIn, register));
-        form.add(WorkspaceStyle.button("Recover with a saved code", () -> credentialForm(null)));
+        var actions = formActions(signIn, register);
+        actions.add(WorkspaceStyle.button("Recover with a saved code", () -> credentialForm(null)));
+        form.add(actions);
         signIn.addActionListener(event -> {
             String address = email.getText();
             char[] secret = password.getPassword();
