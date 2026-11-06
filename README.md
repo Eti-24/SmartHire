@@ -97,3 +97,58 @@ Maven downloads dependencies on the first build. With Java and Maven on `PATH`, 
 - `mvn test` runs unit tests. Create a separate `smarthire_test` database with the same grants before running `mvn '-Dsmarthire.integration=true' test`. The app and tests read the local database credentials from `.local/application.properties`.
 - The [reproduction guide](docs/reproduce-demo.md) covers the project-local tools, optional Aiven profile, database smoke test, and backups.
 - The [database diagram](docs/database/er-diagram.html) shows the MySQL schema. [Implementation status](docs/implementation-status.md) records test results and manual checks.
+
+## Features
+
+### Students
+
+| Feature | What it does |
+| --- | --- |
+| CV templates and uploads | Download an editable Word template or upload your own PDF or DOCX. SmartHire extracts the text and suggests qualifications for you to review. |
+| CV review and version history | Correct skills, education, experience, projects, and certifications before confirming a version for admin review. Open older versions and download the original files. |
+| Job search | Search by title and category, and narrow results by location, salary range, or closing date. |
+| Saved jobs | Bookmark postings and see when they fill or become unavailable. If you already applied, open the application from the saved entry. |
+| Saved searches | Save, rerun, edit, pause, or remove a set of filters. Active searches can send an inbox alert when a newly approved job matches. |
+| Job recommendations | Rank open jobs using your reviewed CV. Open a match to see how each qualification affected the score and which mandatory requirements you still need to meet. |
+| CV improvement checklist | See which qualifications are missing for a particular job and go back to My CV to update your review. |
+| Job comparison | Compare two jobs side by side using the same CV. A separate text similarity figure shows how much the CV and job descriptions overlap. |
+| Applications | Apply once per job with an approved CV version if you meet the mandatory requirements. Track the result, review the original submission, or withdraw while the application is active. |
+| Hiring history | See postings that have filled their vacancies. Your own application result stays in My applications. |
+
+### Companies
+
+| Feature | What it does |
+| --- | --- |
+| Job posting | Set the description, category, location, salary, vacancies, and an optional application deadline with a time zone. Submit the job for approval, edit and resubmit it, or close it. |
+| Structured requirements | Specify skills, education, experience, project evidence, and certifications. Mark any requirement as mandatory to make it a condition for applying. |
+| Job circulars | Download a Word template or attach a PDF or DOCX circular. View its extracted text, download the original, and review suggested requirements from the circular or job description. |
+| Applicant review | Filter and rank applicants for your own postings. Open the qualifications, contact details, and assessment saved at submission, and download the original CV. |
+| Hiring decisions and vacancy tracking | Shortlist, reject, or hire applicants. Filling the last vacancy removes the job from search and stops new applications. Company hiring history links back to the successful applications. |
+| Recruiter notes and scorecards | Keep private notes on an application and record a scorecard after a confirmed interview has ended. |
+
+### Admins
+
+| Feature | What it does |
+| --- | --- |
+| Company verification | Verify companies so their approved jobs can appear in search. Removing verification hides their jobs from students. |
+| Job moderation | Approve or reject job postings. Edits to a posting return it to review, and its requirements are frozen once it has an application. |
+| CV approval | Review the original document and confirmed qualifications, then approve or reject that specific CV version. |
+| Categories and skills | Maintain job categories, technical and soft skills, and skill aliases used in job postings and CV reviews. |
+| Matching weights | Activate a scoring policy for current recommendations and applicant rankings. Each application retains the score and policy used when it was submitted. |
+| Account access | Enable or disable student and company accounts while retaining their history. |
+| Application monitoring | Filter applications by job, company, student, or status and inspect their original assessments in a read-only view. |
+| Data export and erasure | Export data for a selected student, company, job, or CV version, or permanently erase the selected record and its associated data. |
+| Activity log | Look up recorded admin actions such as moderation decisions, exports, and erasures. |
+
+### Shared features
+
+| Feature | What it does |
+| --- | --- |
+| Accounts and profiles | Students and companies can register. Each role signs in to its own workspace, where users can update profile details, change passwords, and generate recovery codes for a password reset. |
+| Dashboards | See counts relevant to your role and a chart of application statuses. |
+| Notifications | Check the inbox for events such as approvals, application updates, and saved-search matches. SmartHire remembers which notices you've read. |
+| Interview scheduling | Companies propose interview times for shortlisted applicants and can cancel interviews. Students can accept or request a different time. Both sides can see the schedule and its revisions. |
+| Application timeline | Students and companies can review the submission, recorded status changes, and interview updates in order. |
+| Recruitment reports | Companies and admins can filter applications and review conversion rates, average times between recorded events, and current vacancy counts. |
+| Local and cloud database setup | Run SmartHire with local MySQL or use the separate Windows launcher for an Aiven MySQL database. |
+| Demo data | Load fictional accounts and jobs, then use the included CVs and job circular to try the recruitment workflow. |
