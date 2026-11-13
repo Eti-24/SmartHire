@@ -56,10 +56,15 @@ final class WorkspacePanel extends JPanel {
         var panel = new JPanel(new BorderLayout(0, 12));
         var counts = new JPanel(new GridLayout(0, 4, 8, 8));
         data.counts().forEach((label, count) -> {
+            int accent = counts.getComponentCount() % WorkspaceStyle.ACCENTS.length;
             var card = new JPanel(new BorderLayout(0, 2));
-            WorkspaceStyle.surface(card, 10);
+            WorkspaceStyle.surface(card, 12);
+            card.setBackground(WorkspaceStyle.TINTS[accent]);
+            card.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(4, 0, 0, 0, WorkspaceStyle.ACCENTS[accent]), card.getBorder()));
             var number = WorkspaceStyle.heading(Long.toString(count));
-            number.setForeground(WorkspaceStyle.TEAL);
+            number.setForeground(WorkspaceStyle.ACCENTS[accent]);
+            number.setFont(number.getFont().deriveFont(28f));
             var caption = WorkspaceStyle.message(label);
             card.add(number, BorderLayout.NORTH);
             card.add(caption, BorderLayout.CENTER);

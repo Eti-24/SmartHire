@@ -1,4 +1,4 @@
-param([switch]$SeedDemo, [switch]$Cloud, [switch]$BuildOnly, [switch]$UpgradeDatabase)
+param([switch]$SeedDemo, [switch]$Cloud, [switch]$BuildOnly, [switch]$UpgradeDatabase, [switch]$Offline)
 $ErrorActionPreference = 'Stop'
 if ($UpgradeDatabase -and (!$Cloud -or $SeedDemo -or $BuildOnly)) {
     throw 'Use -Cloud -UpgradeDatabase by itself to prepare the cloud database.'
@@ -14,12 +14,21 @@ try {
         }
         $smartHireJavaOptions += '-Dsmarthire.config=.local/aiven.properties', '-Dsmarthire.documents=.local/aiven-documents', '-Dsmarthire.requireCloud=true'
     } else {
-        $smartHireDatabase = Get-Content .local/database.json -Raw | ConvertFrom-Json
-        # The setup generates ASCII credentials. Keep this file private and outside source control.
-        "user=$($smartHireDatabase.user)`npassword=$($smartHireDatabase.password)" |
-            Set-Content .local/application.properties -Encoding ascii
+        if (-not $BuildOnly) {
+            & "$PSScriptRoot/repair-local.ps1" -BuildRuntime -SeedDemo:$SeedDemo -Offline:$Offline
+            if (-not $SeedDemo) {
+                $localRuntime = (Get-Content target/runtime-classpath.txt -Raw).Trim()
+                & java -cp "target/classes;$localRuntime" smarthire.Main
+                if ($LASTEXITCODE -ne 0) { throw 'SmartHire did not complete successfully.' }
+            }
+            return
+        }
+        & "$PSScriptRoot/write-local-config.ps1"
     }
-    & mvn --batch-mode --no-transfer-progress package dependency:build-classpath '-Dmdep.outputFile=target/runtime-classpath.txt' '-DincludeScope=runtime'
+    $buildArguments = @('--batch-mode', '--no-transfer-progress')
+    if ($Offline) { $buildArguments += '-o' }
+    $buildArguments += @('package', 'dependency:build-classpath', '-Dmdep.outputFile=target/runtime-classpath.txt', '-DincludeScope=runtime')
+    & mvn @buildArguments
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     if ($BuildOnly) { return }
     $smartHireRuntime = (Get-Content target/runtime-classpath.txt -Raw).Trim()

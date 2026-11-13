@@ -27,7 +27,7 @@ class CleanDatabaseSmokeTest {
         var credentials = new Properties(); credentials.setProperty("user", admin.getProperty("user")); credentials.setProperty("password", admin.getProperty("password"));
         String schema = "smarthire_smoke_" + UUID.randomUUID().toString().replace("-", "");
         boolean created = false;
-        try (var control = DriverManager.getConnection("jdbc:mysql://127.0.0.1:3306/?sslMode=DISABLED&allowPublicKeyRetrieval=true&connectTimeout=3000&socketTimeout=10000", credentials)) {
+        try (var control = DriverManager.getConnection("jdbc:mysql://127.0.0.1:" + admin.getProperty("port", "3306") + "/?sslMode=DISABLED&allowPublicKeyRetrieval=true&connectTimeout=3000&socketTimeout=10000", credentials)) {
             try {
                 try (var statement = control.createStatement()) { statement.execute("CREATE DATABASE " + schema + " CHARACTER SET utf8mb4"); created = true; }
                 var database = Database.loadSchema(adminFile, schema); database.initialize(); database.initialize();

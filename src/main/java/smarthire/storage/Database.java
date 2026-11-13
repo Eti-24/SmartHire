@@ -59,13 +59,25 @@ public final class Database {
             credentials.setProperty("trustCertificateKeyStorePassword", config.getProperty("trustStorePassword", "changeit"));
             return new Database(remoteUrl + "?connectTimeout=5000&socketTimeout=10000", credentials);
         }
-        return new Database("jdbc:mysql://127.0.0.1:3306/" + schema
+        String port = config.getProperty("port", "3306").trim();
+        try {
+            if (!port.matches("[0-9]{1,5}") || Integer.parseInt(port) < 1 || Integer.parseInt(port) > 65535) {
+                throw new NumberFormatException();
+            }
+        } catch (NumberFormatException exception) {
+            throw new UserError("Set port to a number from 1 to 65535 in the local database configuration.");
+        }
+        return new Database("jdbc:mysql://127.0.0.1:" + port + "/" + schema
                 + "?sslMode=DISABLED&allowPublicKeyRetrieval=true&connectTimeout=3000&socketTimeout=10000",
                 credentials);
     }
 
     public Connection connect() throws SQLException {
-        return DriverManager.getConnection(url, credentials);
+        try {
+            return DriverManager.getConnection(url, credentials);
+        } catch (SQLException exception) {
+            throw connectionFailure(exception);
+        }
     }
 
     public boolean isCloud() {
@@ -98,7 +110,7 @@ public final class Database {
                 if (result.next() && result.getInt(1) == SCHEMA_VERSION) { return; }
             }
         } catch (SQLException exception) {
-            if (!"42S02".equals(exception.getSQLState())) { throw unavailable(); }
+            if (!"42S02".equals(exception.getSQLState())) { throw connectionFailure(exception); }
         }
         throw new UserError("The cloud schema needs an upgrade. Run SmartHire-Cloud.cmd --upgrade-database before signing in.");
     }
@@ -133,7 +145,7 @@ public final class Database {
                 applyMigration(connection, 5, "/db/migration-05-recovery-codes.sql");
             }
         } catch (SQLException exception) {
-            throw unavailable();
+            throw connectionFailure(exception);
         } catch (IOException exception) {
             throw new UserError("Could not read the packaged database schema. Rebuild the application.");
         }
@@ -182,6 +194,26 @@ public final class Database {
             }
             return false;
         }
+    }
+
+    String connectionUrl() { return url; }
+
+    UserError connectionFailure(SQLException exception) {
+        String endpoint = url.substring("jdbc:mysql://".length()).split("\\?", 2)[0];
+        String advice = switch (exception.getErrorCode()) {
+            case 1045 -> "MySQL rejected the configured username or password. Check the account on this server.";
+            case 1044, 1142, 1143, 1227 -> "The MySQL account lacks permission. Ask its administrator to grant access to the SmartHire database.";
+            case 1049 -> "The SmartHire database is missing. Create it on this server using the setup guide.";
+            default -> exception.getSQLState() != null && exception.getSQLState().startsWith("08")
+                    ? "The server could not be reached. Check that it is running on the configured port."
+                            + (isCloud() ? " Check the cloud network and certificate settings."
+                                    : " If XAMPP uses 3306, configure SmartHire's separate MySQL server and its port.")
+                    : "The database operation failed. Check MySQL permissions and the database setup.";
+        };
+        if (!isCloud()) {
+            advice += " For a portable source setup, close SmartHire, run Client-Repair.cmd, then reopen it. For an application-only ZIP, follow its setup guide.";
+        }
+        return new UserError("Database connection: " + endpoint + ". " + advice);
     }
 
     public static UserError unavailable() {

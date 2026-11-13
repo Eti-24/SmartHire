@@ -1,5 +1,7 @@
 # SmartHire development environment
 
+For clients using their existing NetBeans and an independent generated-password MySQL server, follow [Client local setup](client-local-setup.md). The root CMD entry points cover initial setup, explicit confirmed demo reset and starting MySQL before opening the installed IDE after reboot.
+
 This guide records the project-local Windows development environment. For application setup, database configuration, and verification on another machine, see [Reproducing and verifying the demo](reproduce-demo.md).
 
 ## Installed tools
@@ -35,7 +37,7 @@ Open Workbench when needed:
 .\scripts\start-workbench.ps1
 ```
 
-In Workbench create a local TCP connection with host `127.0.0.1`, port `3306`, username `smarthire`, and schema `smarthire`. Obtain its generated password locally from `.local\database.json`; it is not included in this guide. Root administration credentials are separate in `.local\mysql-admin.ini`.
+In Workbench create a local TCP connection with host `127.0.0.1`, the port in `.local/database.json` (3307 for new setups), username `smarthire`, and schema `smarthire`. Obtain its generated password locally from `.local\database.json`; it is not included in this guide. Root administration credentials are separate in `.local\mysql-admin.ini`.
 
 Stop the database when finished:
 
@@ -62,7 +64,7 @@ Windows can still use its normal temporary directories and credential services o
 
 ## Database configuration
 
-- Bound to `127.0.0.1:3306`; MySQL X protocol is disabled.
+- Bound to loopback on the configured port (3307 for new setups, existing 3306 installations retained); MySQL X protocol is disabled.
 - InnoDB buffer pool: 128 MB; maximum connections: 20; performance schema disabled.
 - Development databases: `smarthire` and `smarthire_test`, using `utf8mb4`.
 - Separate generated root and `smarthire` passwords. The development user has privileges on these two databases rather than global server administration.

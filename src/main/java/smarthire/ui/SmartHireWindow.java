@@ -47,7 +47,7 @@ public final class SmartHireWindow extends JFrame {
     private static final BufferedImage LOGO = loadLogo();
     // Isolate the emblem from the wordmark so it remains recognizable at icon sizes.
     private static final BufferedImage EMBLEM = LOGO.getSubimage(402, 94, 602, 602);
-    private static final ImageIcon SIGN_IN_LOGO = new ImageIcon(LOGO.getScaledInstance(224, -1, Image.SCALE_SMOOTH),
+    private static final ImageIcon SIGN_IN_LOGO = new ImageIcon(LOGO.getScaledInstance(144, -1, Image.SCALE_SMOOTH),
             "SmartHire — Intelligent CV Analysis & Job Recommendation");
     private static final ImageIcon SIDEBAR_ICON = new ImageIcon(EMBLEM.getScaledInstance(32, 32, Image.SCALE_SMOOTH));
 
@@ -74,7 +74,8 @@ public final class SmartHireWindow extends JFrame {
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         content.setBorder(BorderFactory.createEmptyBorder(16, 18, 12, 18));
         add(content, BorderLayout.CENTER);
-        status.setBorder(BorderFactory.createEmptyBorder(6, 0, 0, 0));
+        status.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, WorkspaceStyle.LINE),
+                BorderFactory.createEmptyBorder(8, 2, 2, 2)));
         sidebar.setBackground(WorkspaceStyle.NAVY);
         sidebar.setVisible(false);
         add(sidebar, BorderLayout.WEST);
@@ -148,8 +149,23 @@ public final class SmartHireWindow extends JFrame {
         JPanel form = WorkspaceStyle.form();
         JTextField email = new JTextField(30);
         JPasswordField password = new JPasswordField(30);
-        form.add(new JLabel(SIGN_IN_LOGO));
-        form.add(Box.createVerticalStrut(12));
+        var brand = new JPanel(new BorderLayout(20, 0));
+        brand.setOpaque(false);
+        brand.add(new JLabel(SIGN_IN_LOGO), BorderLayout.WEST);
+        var introduction = new JPanel(new GridBagLayout());
+        introduction.setOpaque(false);
+        var copy = new JPanel();
+        copy.setOpaque(false);
+        copy.setLayout(new BoxLayout(copy, BoxLayout.Y_AXIS));
+        var welcome = WorkspaceStyle.heading("Welcome back");
+        welcome.setFont(welcome.getFont().deriveFont(24f));
+        copy.add(welcome);
+        copy.add(new JLabel("Sign in to continue your hiring journey."));
+        introduction.add(copy);
+        brand.add(introduction, BorderLayout.CENTER);
+        brand.setMaximumSize(new Dimension(Integer.MAX_VALUE, brand.getPreferredSize().height));
+        form.add(brand);
+        form.add(Box.createVerticalStrut(16));
         field(form, "Email", email);
         field(form, "Password", password);
         JButton signIn = new JButton("Sign in");
@@ -176,6 +192,12 @@ public final class SmartHireWindow extends JFrame {
                 password.setText("");
                 session = result.token();
                 home(result.profile());
+            }, failure -> {
+                password.setText("");
+                javax.swing.JOptionPane.showMessageDialog(this, failure instanceof UserError ? failure.getMessage()
+                        : "Sign-in could not be completed. Please try again.", "Sign-in failed",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+                password.requestFocusInWindow();
             });
         });
         register.addActionListener(event -> register());
@@ -346,7 +368,7 @@ public final class SmartHireWindow extends JFrame {
         button.setHorizontalAlignment(SwingConstants.LEADING);
         button.setForeground(Color.WHITE);
         button.setBackground(WorkspaceStyle.NAVY);
-        button.setBorder(BorderFactory.createEmptyBorder(3, 9, 3, 9));
+        button.setBorder(BorderFactory.createEmptyBorder(3, 11, 3, 11));
         button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
         button.setPreferredSize(new Dimension(180, 36));
         button.setToolTipText(label);
@@ -358,7 +380,7 @@ public final class SmartHireWindow extends JFrame {
     private void select(String section) {
         navigation.forEach((name, button) -> {
             boolean current = name.equals(section);
-            button.setBackground(current ? WorkspaceStyle.TEAL : WorkspaceStyle.NAVY);
+            button.setBackground(current ? WorkspaceStyle.ACCENTS[WorkspaceStyle.sectionAccent(section)] : WorkspaceStyle.NAVY);
             button.setFont(button.getFont().deriveFont(current ? Font.BOLD : Font.PLAIN));
             button.getAccessibleContext().setAccessibleDescription(current ? "Current section" : null);
         });
@@ -502,7 +524,19 @@ public final class SmartHireWindow extends JFrame {
         select(title.equals("Job details") ? "Job matches" : title);
         JLabel heading = new JLabel(title);
         heading.setFont(heading.getFont().deriveFont(Font.BOLD, 26f));
-        content.add(heading, BorderLayout.NORTH);
+        heading.setForeground(WorkspaceStyle.NAVY);
+        var header = new JPanel(new BorderLayout(0, 3));
+        WorkspaceStyle.surface(header, 10);
+        int accent = WorkspaceStyle.sectionAccent(title);
+        header.setBackground(WorkspaceStyle.TINTS[accent]);
+        header.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 5, 0, 0, WorkspaceStyle.ACCENTS[accent]), header.getBorder()));
+        header.add(heading, BorderLayout.NORTH);
+        var subtitle = new JLabel(sectionDescription(title));
+        subtitle.setForeground(WorkspaceStyle.MUTED);
+        subtitle.setFont(subtitle.getFont().deriveFont(13f));
+        header.add(subtitle, BorderLayout.SOUTH);
+        content.add(header, BorderLayout.NORTH);
         if (scrollable) {
             content.add(WorkspaceStyle.scroll(body), BorderLayout.CENTER);
         } else {
@@ -515,6 +549,30 @@ public final class SmartHireWindow extends JFrame {
         content.repaint();
     }
 
+    private static String sectionDescription(String title) {
+        return switch (title) {
+            case "SmartHire \u00b7 Sign in" -> "Intelligent matching. Clearer opportunities.";
+            case "Create account", "Create an account" -> "Start your journey as a student or company.";
+            case "Overview" -> "Your workspace activity at a glance.";
+            case "Find jobs", "Job details" -> "Explore opportunities and review what each role needs.";
+            case "Job matches" -> "Understand your eligibility and how your qualifications match.";
+            case "My CV" -> "Build, review and manage your qualification profile.";
+            case "My applications" -> "Follow your applications and their progress.";
+            case "Applicants" -> "Review candidates and manage hiring decisions.";
+            case "My jobs", "Jobs and administration" -> "Manage postings and their publication status.";
+            case "Interviews" -> "Keep interview arrangements and responses in one place.";
+            case "Hiring history" -> "Explore completed hiring activity on SmartHire.";
+            case "Notifications" -> "Stay up to date with your workspace.";
+            case "CV review" -> "Review each submitted CV version and its supporting evidence.";
+            case "Accounts", "Data management", "Activity log", "Application monitoring" -> "Manage platform activity with the appropriate access controls.";
+            case "Reports" -> "Explore application progress and hiring outcomes.";
+            case "Saved jobs" -> "Return to the opportunities you bookmarked.";
+            case "Saved searches" -> "Your search preferences and matching-job alerts.";
+            case "My profile", "Change password", "Recovery codes", "Account recovery" -> "Manage your details and account access.";
+            default -> "Your SmartHire workspace.";
+        };
+    }
+
     private static JPanel centered(JPanel form) {
         var frame = new JPanel(new GridBagLayout());
         frame.add(form);
@@ -523,6 +581,7 @@ public final class SmartHireWindow extends JFrame {
 
     private static JPanel formActions(JButton primary, JButton secondary) {
         var actions = WorkspaceStyle.actions();
+        actions.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING, 6, 0));
         actions.setOpaque(false);
         actions.setAlignmentX(Component.LEFT_ALIGNMENT);
         WorkspaceStyle.primary(primary);
@@ -540,6 +599,10 @@ public final class SmartHireWindow extends JFrame {
     }
 
     private <T> void run(Callable<T> task, Consumer<T> success, Runnable failure) {
+        run(task, success, ignored -> failure.run());
+    }
+
+    private <T> void run(Callable<T> task, Consumer<T> success, Consumer<Throwable> failure) {
         if (busy) {
             return;
         }
@@ -567,9 +630,9 @@ public final class SmartHireWindow extends JFrame {
                     Thread.currentThread().interrupt();
                     status.setText("The operation was interrupted. Try again.");
                 } catch (ExecutionException exception) {
-                    failure.run();
-                    status.setForeground(new Color(160, 35, 35));
                     Throwable cause = exception.getCause();
+                    failure.accept(cause);
+                    status.setForeground(new Color(160, 35, 35));
                     status.setText(cause instanceof UserError ? cause.getMessage()
                             : "The operation could not be completed. Please restart SmartHire and try again.");
                 }

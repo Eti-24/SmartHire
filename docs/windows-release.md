@@ -36,7 +36,7 @@ Use your cloud SmartHire sign-in. To seed a fresh Aiven database, create `.local
 
 ## Use local MySQL
 
-Install [MySQL Community Server 8.4 LTS](https://dev.mysql.com/downloads/mysql/8.4.html). Set an administrator password, configure local TCP port `3306`, and start the MySQL service. Run the SQL below in the MySQL client or [MySQL Workbench](https://dev.mysql.com/downloads/workbench/).
+Install [MySQL Community Server 8.4 LTS](https://dev.mysql.com/downloads/mysql/8.4.html). Set an administrator password, configure local TCP port `3307` (or another unused port), and start the MySQL service. Run the SQL below in the MySQL client or [MySQL Workbench](https://dev.mysql.com/downloads/workbench/).
 
 ## Configure MySQL
 
@@ -52,9 +52,14 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
 In the SmartHire folder, create a directory named `.local`. Save a plain-text file named `application.properties` there, using the same account and password. Use a password without backslashes or whitespace for the example below, and make sure the filename ends in `.properties`.
 
 ```properties
+port=3307
 user=smarthire
 password=YOUR_LOCAL_PASSWORD
 ```
+
+The database and MySQL account must already exist before this file can work. A saved Workbench connection does not create an account. Use the same host (`127.0.0.1`), port, username and password that successfully connect in Workbench. A file with only `user` and `password` uses port 3306; set `port` explicitly for any other server port. Check Windows file extensions so the filename is `application.properties`, not `application.properties.txt`.
+
+Keep `.local` inside the extracted app folder, beside `SmartHire.cmd`. Settings from a source checkout are private and are not included in the download. Source-only commands such as `Client-Setup.cmd` and `Client-Repair.cmd` are available from the repository's **Code > Download ZIP** download; this application ZIP uses the manual MySQL setup described here.
 
 SmartHire creates its tables on first startup. It stores original uploaded CVs and circulars in `.local/documents`. Keep `.local` private and back up the document folder together with the database.
 
@@ -63,6 +68,7 @@ SmartHire creates its tables on first startup. It stores original uploaded CVs a
 Open PowerShell in the extracted folder and run these commands.
 
 ```powershell
+.\SmartHire.cmd --check-database
 .\SmartHire.cmd --seed-demo
 .\SmartHire.cmd
 ```
@@ -71,4 +77,12 @@ On a fresh database, the seed creates eight fictional accounts, eight postings a
 
 Sign in as `student@smarthire.example`, `company@smarthire.example`, or `admin@smarthire.example` with the local demo password `SmartHireDemo!21`. Open `demo data/Demo accounts.md` for the full list and use the PDFs beside it to try CV review and circular upload. A student confirms a CV under **My CV**, then an admin approves that version under **CV review** before the student can apply to an eligible posting.
 
-If the sign-in screen reports a database error, check that the local MySQL service is running on port `3306` and that `.local/application.properties` matches the MySQL account. Close an existing SmartHire window before launching a second copy from the same folder.
+If the sign-in screen reports a database error, check that the local MySQL service is running on the port configured in `.local/application.properties` and that `.local/application.properties` matches the MySQL account. Close an existing SmartHire window before launching a second copy from the same folder.
+
+### Running alongside XAMPP
+
+Keep XAMPP on its existing port. Configure the separate SmartHire MySQL server on an unused port such as 3307, and use that same port in Workbench and `application.properties`. Changing the properties file changes the app connection only; configure the server port separately. Create the SmartHire account and database on that server. No XAMPP accounts, services or data need to be changed.
+
+Older properties files without `port` continue to use 3306. Existing databases are retained. For an existing server, back up its database and document folder before changing its configuration. Do not point a second server at an existing server's data directory.
+
+The extracted launcher uses Windows 10's Command Prompt or Windows PowerShell. Source setup scripts require PowerShell 7. New portable source setups use 3307, with `scripts/setup-local.ps1 -Port 3308` available if it is occupied. Re-running setup retains an initialized server and its original port. Connection errors identify the configured endpoint and distinguish rejected credentials, missing databases, permissions and connectivity failures.

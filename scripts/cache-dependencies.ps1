@@ -45,7 +45,7 @@ public class ToolchainCheck {
         }
         var properties = new Properties();
         try (var input = new FileInputStream(args[0])) { properties.load(input); }
-        try (var connection = DriverManager.getConnection("jdbc:mysql://127.0.0.1:3306/smarthire?sslMode=DISABLED&allowPublicKeyRetrieval=true", properties);
+        try (var connection = DriverManager.getConnection("jdbc:mysql://127.0.0.1:" + properties.getProperty("port", "3306") + "/smarthire?sslMode=DISABLED&allowPublicKeyRetrieval=true", properties);
              var statement = connection.createStatement();
              var rows = statement.executeQuery("SELECT VERSION()")) {
             rows.next();
@@ -55,7 +55,7 @@ public class ToolchainCheck {
 }
 '@ | Set-Content -LiteralPath (Join-Path $bootstrap 'ToolchainCheck.java') -Encoding utf8NoBOM
 $db = Get-Content -LiteralPath (Join-Path $project '.local\database.json') -Raw | ConvertFrom-Json
-"user=$($db.user)`npassword=$($db.password)" | Set-Content -LiteralPath (Join-Path $bootstrap 'database.properties') -Encoding ascii
+"port=$(if ($db.port) { $db.port } else { 3306 })`nuser=$($db.user)`npassword=$($db.password)" | Set-Content -LiteralPath (Join-Path $bootstrap 'database.properties') -Encoding ascii
 $classpath = (Get-Content -LiteralPath (Join-Path $bootstrap 'classpath.txt') -Raw).Trim()
 & javac --release 21 -proc:none -cp $classpath (Join-Path $bootstrap 'ToolchainCheck.java')
 if ($LASTEXITCODE -ne 0) { throw 'Java 21 compilation check failed.' }

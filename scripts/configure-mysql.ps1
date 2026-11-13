@@ -1,3 +1,4 @@
+param([ValidateRange(1, 65535)][int]$Port = 3307)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'dev-env.ps1')
 $project = Split-Path $PSScriptRoot -Parent
@@ -13,7 +14,13 @@ if (Test-Path -LiteralPath (Join-Path $data 'mysql')) {
     return
 }
 if (Test-Path -LiteralPath $adminConfig) { throw 'Credentials already exist without initialized data. Inspect .local before retrying.' }
-if (Get-NetTCPConnection -LocalPort 3306 -State Listen -ErrorAction SilentlyContinue) { throw 'Port 3306 is already in use. No existing server will be changed.' }
+$portProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $Port)
+try {
+    $portProbe.Server.ExclusiveAddressUse = $true
+    $portProbe.Start()
+} catch {
+    throw "Port $Port is unavailable. Choose another port with -Port. No existing server will be changed."
+} finally { $portProbe.Stop() }
 $rootPassword = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
 $appPassword = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
 $base = (Join-Path $project '.tools\mysql-8.4.13-winx64').Replace('\', '/')
@@ -23,7 +30,7 @@ $logPath = (Join-Path $local 'mysql-error.log').Replace('\', '/')
 [mysqld]
 basedir="$base"
 datadir="$dataPath"
-port=3306
+port=$Port
 bind-address=127.0.0.1
 mysqlx=0
 innodb-buffer-pool-size=128M
@@ -34,7 +41,7 @@ log-error="$logPath"
 
 [client]
 host=127.0.0.1
-port=3306
+port=$Port
 protocol=TCP
 "@ | Set-Content -LiteralPath $config -Encoding utf8NoBOM
 @"
@@ -42,7 +49,7 @@ protocol=TCP
 user=root
 password=$rootPassword
 host=127.0.0.1
-port=3306
+port=$Port
 protocol=TCP
 "@ | Set-Content -LiteralPath $adminConfig -Encoding utf8NoBOM
 @"
@@ -50,11 +57,11 @@ protocol=TCP
 user=smarthire
 password=$appPassword
 host=127.0.0.1
-port=3306
+port=$Port
 protocol=TCP
 database=smarthire
 "@ | Set-Content -LiteralPath $appConfig -Encoding utf8NoBOM
-@{host='127.0.0.1';port=3306;database='smarthire';testDatabase='smarthire_test';user='smarthire';password=$appPassword} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $local 'database.json') -Encoding utf8NoBOM
+@{host='127.0.0.1';port=$Port;database='smarthire';testDatabase='smarthire_test';user='smarthire';password=$appPassword} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $local 'database.json') -Encoding utf8NoBOM
 $initFile = Join-Path $local 'mysql-first-start.sql'
 @"
 ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootPassword';

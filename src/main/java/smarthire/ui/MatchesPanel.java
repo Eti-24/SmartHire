@@ -63,7 +63,7 @@ final class MatchesPanel extends JPanel {
         table.getSelectionModel().addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting()) { updatePreview(); }
         });
-        var actions = new JPanel(new FlowLayout(FlowLayout.LEADING, 6, 0));
+        var actions = WorkspaceStyle.actions();
         WorkspaceStyle.primary(openJob);
         actions.add(openJob);
         actions.add(explain);

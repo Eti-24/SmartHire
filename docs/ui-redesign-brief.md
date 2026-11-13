@@ -39,3 +39,17 @@ The conversation preview contains fictional records for Student Job matches, Com
 - Run existing unit tests and packaging; run database verification if service or database behavior changes. Review the full diff and report interactive checks separately.
 
 The redesigned build passed 84 automated checks, including the clean-database smoke test. A compact Swing run at 125% Java scaling exercised the three-role workflow programmatically. Physical 1366 × 768 acceptance through Windows input remains unverified.
+
+## November 2026 client polish
+
+Retain the supplied SmartHire logo and teal/navy identity. Apply consistent rounded buttons with visible keyboard focus, hover and disabled states; white section headers with teal accents; clear form labels; readable table headings and alternating rows; and prominent dashboard counts. Keep the sign-in card compact with Sign in, Create an account and recovery actions aligned. Failed sign-in opens an error dialog and supports immediate retry. Saved searches and alerts remain in scope and enabled; removal is deferred.
+
+The compact three-role Swing walkthrough and normal/125% authentication alignment checks passed. Physical input and the client's Windows 10/XAMPP setup remain separate acceptance checks. See `implementation-status.md` for evidence.
+
+## Saved-item and colour follow-up
+
+Keep Saved jobs, Saved searches and automatic approval alerts. The client's report did not specify a failure. A reproducible compact-screen check found wrapped search controls clipped by a one-row action-bar height. Shared action bars now measure wrapped rows, including the Job matches footer. Authentication action rows retain compact spacing to preserve registration/recovery reachability.
+
+Extend teal with blue for applications/reports, violet for CV/profile/saved sections and amber for interviews/notifications/admin access tools. Use tinted section headers and selected navigation, varied dashboard count cards, and pale blue table/tab surfaces. Status text and existing semantic colours retain their meaning; section colours do not imply eligibility, CV approval or hiring status. Keep the supplied logo unchanged.
+
+The programmatic compact walkthrough screenshots are `target/ui-checkpoint-jobs.png` and `target/ui-checkpoint-admin-dashboard.png`, with other role screens alongside them. Their layouts and palette were visually inspected. The action-row regression is covered by `SavedItemsUiIntegrationTest`; authentication alignment is separately checked at normal and 125% scaling.

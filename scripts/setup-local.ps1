@@ -1,5 +1,5 @@
 #Requires -Version 7.0
-param([switch]$SeedDemo)
+param([switch]$SeedDemo, [ValidateRange(1, 65535)][int]$Port = 3307, [switch]$Offline)
 
 $ErrorActionPreference = 'Stop'
 $project = Split-Path $PSScriptRoot -Parent
@@ -21,15 +21,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'MySQL could not run. Check the x64 Visual C++ Redistributable listed in README.md.' }
 
     Write-Host '[2/3] Configure and start local MySQL'
-    & "$PSScriptRoot/configure-mysql.ps1"
+    & "$PSScriptRoot/configure-mysql.ps1" -Port $Port
     & "$PSScriptRoot/start-mysql.ps1"
 
     Write-Host '[3/3] Build SmartHire'
-    if ($SeedDemo) {
-        & "$PSScriptRoot/run.ps1" -SeedDemo
-    } else {
-        & "$PSScriptRoot/run.ps1" -BuildOnly
-    }
+    & "$PSScriptRoot/repair-local.ps1" -BuildRuntime -SeedDemo:$SeedDemo -Offline:$Offline
     Write-Host 'Setup complete. Open SmartHire with .\scripts\run.ps1'
 } finally {
     Pop-Location

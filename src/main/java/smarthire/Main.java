@@ -33,6 +33,18 @@ public final class Main {
             checkDatabase(config);
             return;
         }
+        if (args.length == 1 && args[0].equals("--prepare-local")) {
+            try {
+                Database database = Database.load(config, false);
+                if (database.isCloud()) { throw new UserError("Local repair cannot change a cloud database."); }
+                database.initialize();
+                System.out.println("Local SmartHire schema is ready.");
+            } catch (UserError exception) {
+                System.err.println(exception.getMessage());
+                System.exit(1);
+            }
+            return;
+        }
         if (args.length == 1 && args[0].equals("--upgrade-database")) {
             try {
                 Database database = Database.load(config, false);

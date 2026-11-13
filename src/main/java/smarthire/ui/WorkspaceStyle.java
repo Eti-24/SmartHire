@@ -33,12 +33,27 @@ import javax.swing.table.DefaultTableCellRenderer;
 
 final class WorkspaceStyle {
     static final Color NAVY = new Color(22, 40, 61);
-    static final Color WORKSPACE = new Color(244, 247, 250);
-    static final Color TEAL = new Color(0, 107, 117);
+    static final Color WORKSPACE = new Color(240, 246, 247);
+    static final Color TEAL = new Color(0, 112, 119);
     static final Color INK = new Color(23, 43, 61);
     static final Color MUTED = new Color(77, 96, 113);
     static final Color LINE = new Color(216, 226, 234);
     static final Color DANGER = new Color(156, 37, 42);
+    static final Color BLUE = new Color(38, 83, 159);
+    static final Color VIOLET = new Color(103, 66, 161);
+    static final Color AMBER = new Color(139, 87, 10);
+    static final Color[] ACCENTS = {TEAL, BLUE, VIOLET, AMBER};
+    static final Color[] TINTS = {new Color(220, 245, 239), new Color(227, 237, 255),
+            new Color(239, 229, 252), new Color(255, 241, 211)};
+
+    static int sectionAccent(String section) {
+        return switch (section) {
+            case "My CV", "CV review", "My profile", "Saved jobs", "Saved searches" -> 2;
+            case "My applications", "Applicants", "Hiring history", "Reports", "Application monitoring" -> 1;
+            case "Notifications", "Interviews", "Accounts", "Data management", "Activity log" -> 3;
+            default -> 0;
+        };
+    }
 
     private WorkspaceStyle() { }
 
@@ -53,7 +68,24 @@ final class WorkspaceStyle {
         }
         UIManager.put("Panel.background", WORKSPACE);
         UIManager.put("Label.foreground", INK);
-        UIManager.put("Button.background", new Color(234, 240, 245));
+        UIManager.put("ButtonUI", WorkspaceButtonUI.class.getName());
+        UIManager.put("Button.background", new Color(232, 242, 243));
+        UIManager.put("Button.foreground", INK);
+        UIManager.put("Button.disabledText", MUTED);
+        UIManager.put("Button.border", new javax.swing.plaf.BorderUIResource.EmptyBorderUIResource(8, 12, 8, 12));
+        UIManager.put("TextField.background", Color.WHITE);
+        UIManager.put("PasswordField.background", Color.WHITE);
+        UIManager.put("TextField.selectionBackground", new Color(196, 232, 230));
+        UIManager.put("PasswordField.selectionBackground", new Color(196, 232, 230));
+        UIManager.put("TabbedPane.selected", Color.WHITE);
+        UIManager.put("TabbedPane.background", TINTS[1]);
+        UIManager.put("TabbedPane.contentAreaColor", Color.WHITE);
+        UIManager.put("ToolTip.background", new Color(235, 247, 246));
+        UIManager.put("ToolTip.foreground", INK);
+        var inputBorder = new javax.swing.plaf.BorderUIResource.CompoundBorderUIResource(
+                BorderFactory.createLineBorder(LINE), BorderFactory.createEmptyBorder(5, 8, 5, 8));
+        UIManager.put("TextField.border", inputBorder);
+        UIManager.put("PasswordField.border", inputBorder);
     }
 
     static JButton button(String label, Runnable action) {
@@ -68,13 +100,39 @@ final class WorkspaceStyle {
     }
 
     static JPanel actions() {
-        return new JPanel(new FlowLayout(FlowLayout.LEADING, 6, 0));
+        return new JPanel(new FlowLayout(FlowLayout.LEADING, 6, 6)) {
+            @Override public Dimension getPreferredSize() {
+                // FlowLayout wraps children but normally reports only one row of height.
+                // BorderLayout then clips the wrapped search/save controls on laptop screens.
+                int width = getWidth();
+                if (width <= 0 && getParent() != null) { width = getParent().getWidth(); }
+                if (width <= 0) { return super.getPreferredSize(); }
+                var insets = getInsets();
+                var layout = (FlowLayout) getLayout();
+                int horizontalGap = layout.getHgap(), verticalGap = layout.getVgap();
+                int available = Math.max(1, width - insets.left - insets.right - 2 * horizontalGap);
+                int rowWidth = 0, rowHeight = 0, height = verticalGap;
+                for (Component child : getComponents()) {
+                    if (!child.isVisible()) { continue; }
+                    var size = child.getPreferredSize();
+                    if (rowWidth > 0 && rowWidth + horizontalGap + size.width > available) {
+                        height += rowHeight + verticalGap;
+                        rowWidth = 0;
+                        rowHeight = 0;
+                    }
+                    rowWidth += (rowWidth == 0 ? 0 : horizontalGap) + size.width;
+                    rowHeight = Math.max(rowHeight, size.height);
+                }
+                return new Dimension(width, height + rowHeight + verticalGap + insets.top + insets.bottom);
+            }
+        };
     }
 
     static JLabel heading(String value) {
         var label = new JLabel(value);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 17f));
-        label.setBorder(BorderFactory.createEmptyBorder(0, 0, 4, 4));
+        label.setForeground(NAVY);
+        label.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 4));
         return label;
     }
 
@@ -87,13 +145,15 @@ final class WorkspaceStyle {
     static JPanel form() {
         var form = new Form();
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
-        surface(form, 14);
+        surface(form, 20);
         return form;
     }
 
     static void field(JPanel form, String label, JComponent input) {
         var caption = new JLabel(label);
         caption.setLabelFor(input);
+        caption.setForeground(MUTED);
+        caption.setFont(caption.getFont().deriveFont(Font.BOLD, 13f));
         caption.setAlignmentX(Component.LEFT_ALIGNMENT);
         input.setAlignmentX(Component.LEFT_ALIGNMENT);
         int height = input instanceof JScrollPane ? Math.min(150, input.getPreferredSize().height) : 32;
@@ -142,15 +202,31 @@ final class WorkspaceStyle {
     }
 
     static JScrollPane table(JTable table) {
-        table.setRowHeight(34);
+        table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override public Component getTableCellRendererComponent(JTable owner, Object value, boolean selected,
+                    boolean focused, int row, int column) {
+                super.getTableCellRendererComponent(owner, value, selected, focused, row, column);
+                if (!selected) { setBackground(row % 2 == 0 ? Color.WHITE : new Color(242, 246, 255)); }
+                if (!focused) { setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8)); }
+                return this;
+            }
+        });
+        table.setRowHeight(36);
+        table.setIntercellSpacing(new Dimension(0, 1));
         table.setShowVerticalLines(false);
         table.setGridColor(LINE);
         table.setSelectionBackground(new Color(210, 236, 236));
         table.setSelectionForeground(INK);
-        table.getTableHeader().setBackground(WORKSPACE);
+        table.getTableHeader().setBackground(TINTS[1]);
+        table.getTableHeader().setForeground(NAVY);
+        table.getTableHeader().setFont(table.getFont().deriveFont(Font.BOLD, 13f));
+        table.getTableHeader().setPreferredSize(new Dimension(0, 36));
         table.setFillsViewportHeight(true);
         table.setPreferredScrollableViewportSize(new Dimension(420, 230));
-        return new JScrollPane(table);
+        var scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createLineBorder(LINE));
+        scroll.getViewport().setBackground(Color.WHITE);
+        return scroll;
     }
 
     static void statusColumn(JTable table, int column) {
