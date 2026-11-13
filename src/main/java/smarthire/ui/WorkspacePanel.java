@@ -59,13 +59,14 @@ final class WorkspacePanel extends JPanel {
             int accent = counts.getComponentCount() % WorkspaceStyle.ACCENTS.length;
             var card = new JPanel(new BorderLayout(0, 2));
             WorkspaceStyle.surface(card, 12);
-            card.setBackground(WorkspaceStyle.TINTS[accent]);
+            card.setBackground(WorkspaceStyle.ACCENTS[accent]);
             card.setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createMatteBorder(4, 0, 0, 0, WorkspaceStyle.ACCENTS[accent]), card.getBorder()));
             var number = WorkspaceStyle.heading(Long.toString(count));
-            number.setForeground(WorkspaceStyle.ACCENTS[accent]);
+            number.setForeground(Color.WHITE);
             number.setFont(number.getFont().deriveFont(28f));
             var caption = WorkspaceStyle.message(label);
+            caption.setForeground(Color.WHITE);
             card.add(number, BorderLayout.NORTH);
             card.add(caption, BorderLayout.CENTER);
             counts.add(card);
@@ -194,7 +195,8 @@ final class WorkspacePanel extends JPanel {
             preview.showRecord("No records", "Choose another record type to view its data.");
             var export = WorkspaceStyle.button("Export data…", () -> exportData(WorkspaceStyle.selected(table, entries)));
             var erase = WorkspaceStyle.button("Permanently erase…", () -> confirmErase(WorkspaceStyle.selected(table, entries), kind));
-            erase.setForeground(WorkspaceStyle.DANGER);
+            erase.setBackground(WorkspaceStyle.DANGER);
+            erase.setForeground(Color.WHITE);
             export.setEnabled(false);
             erase.setEnabled(false);
             WorkspaceStyle.previewSelection(table, entries, entry -> {

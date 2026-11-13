@@ -524,16 +524,16 @@ public final class SmartHireWindow extends JFrame {
         select(title.equals("Job details") ? "Job matches" : title);
         JLabel heading = new JLabel(title);
         heading.setFont(heading.getFont().deriveFont(Font.BOLD, 26f));
-        heading.setForeground(WorkspaceStyle.NAVY);
+        heading.setForeground(Color.WHITE);
         var header = new JPanel(new BorderLayout(0, 3));
         WorkspaceStyle.surface(header, 10);
         int accent = WorkspaceStyle.sectionAccent(title);
-        header.setBackground(WorkspaceStyle.TINTS[accent]);
+        header.setBackground(WorkspaceStyle.ACCENTS[accent]);
         header.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 5, 0, 0, WorkspaceStyle.ACCENTS[accent]), header.getBorder()));
         header.add(heading, BorderLayout.NORTH);
         var subtitle = new JLabel(sectionDescription(title));
-        subtitle.setForeground(WorkspaceStyle.MUTED);
+        subtitle.setForeground(Color.WHITE);
         subtitle.setFont(subtitle.getFont().deriveFont(13f));
         header.add(subtitle, BorderLayout.SOUTH);
         content.add(header, BorderLayout.NORTH);

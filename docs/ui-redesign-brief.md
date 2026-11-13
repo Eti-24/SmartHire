@@ -13,6 +13,10 @@ The user accepted the three-role design preview on 2026-11-05 and accepted the i
 - Make hiring evidence clear: eligibility and unmet mandatory requirements take visual priority over match score.
 - Establish the design first through Job matches, Applicants and admin CV review before extending it throughout the application.
 
+## Client colour revision, 2026-11-13
+
+The client requested deeper colours in place of the pastel treatment. Use solid deep teal, royal blue, violet and burnt amber for section banners, selected navigation and dashboard cards, with white lettering. Shared action buttons and table headers use deep blue, primary actions and selected rows use teal, and destructive actions use red. Keep forms and document previews light for reading; preserve explicit status labels and readable selected states.
+
 ## Rules the presentation must preserve
 
 Use CONTEXT.md and docs/spec-draft.md as the domain authorities. Eligibility, CV approval and application status are separate concepts. Meeting mandatory requirements does not establish that a CV is approved for submission. Current-policy ranking and original submission assessments must remain clearly distinguished. Existing permissions, immutable submitted evidence and application transitions remain unchanged.

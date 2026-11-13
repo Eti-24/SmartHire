@@ -1,5 +1,17 @@
 # Implementation status
 
+## Deeper client colour palette, 2026-11-13
+
+Replaced pastel section banners and dashboard cards with solid deep teal, royal blue, violet and burnt amber, using white text. Shared buttons and table headers use blue; primary actions and selected table rows use teal. Selected status text stays white and the destructive data action has a red background. Forms and document previews retain light reading surfaces. No services, database contracts or saved-item behaviour changed.
+
+`scripts/verify.ps1 -Offline` passed 119 tests with zero failures/errors; the optional clean-schema smoke was skipped (120 discovered), and packaging succeeded (`target/deep-colours-verification.log`). The first attempt found MySQL stopped; after starting the project server the rerun passed. White text contrast on the five coloured action surfaces and hover states exceeds 4.5:1. The compact three-role programmatic Swing walkthrough passed at 125% scaling (`target/deep-colours-walkthrough.log`); sign-in, dashboard, CV, company applicants and admin detail screenshots were inspected. That review caught an unreadable selected tab, corrected to navy with white text; the walkthrough then passed again and the final package reran all 49 unit tests successfully (`target/deep-colours-final-package.log`, 71 integration checks intentionally skipped in that unit run). `git diff --check` passed. The desktop preview was not targetable through Computer Use, so physical desktop input is not claimed.
+
+## Version 0.1.5 release package verification, 2026-11-13
+
+- `scripts/verify.ps1 -Offline -CleanDatabaseSmoke` passed all 120 tests with zero failures, errors, or skips, including fresh-schema smoke and packaging (`target/deep-colours-release-verification.log`).
+- Local and cloud 0.1.5 package builds each passed all 49 unit tests; the 71 database integration checks were skipped in those packaging runs. Both extracted ZIPs contain the launcher, app, libraries, guide, and demo files, with no private configuration. Their launchers passed read-only `--check-database` against the configured local and cloud databases.
+- SHA-256: local `8367C251675A3FC359E571C7D361AFCBED8F2DF58EC50F8FFE84BFAD4F1E020E`; cloud `02E1CAA0017DE2B28FC7F165C3A9724D3358B512F38B09AFC9E618EC36049CA4`.
+
 ## Version 0.1.4 release verification, 2026-11-13
 
 Prepared the local and cloud Windows ZIPs from the current client-setup and interface changes. The root README and bundled release guide now explain that an application properties file requires a real MySQL account, how to match the server port, where private settings belong and which setup commands are available in the source download.

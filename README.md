@@ -1,6 +1,6 @@
 # SmartHire
 
-Version **0.1.4** is available in [Releases](https://github.com/Eti-24/SmartHire/releases/tag/v0.1.4) as separate local and cloud Windows ZIPs. Each ZIP includes the app, required Java libraries, demo files and its setup guide. Install Java 21 before launching.
+Version **0.1.5** is available in [Releases](https://github.com/Eti-24/SmartHire/releases/tag/v0.1.5) as separate local and cloud Windows ZIPs. Each ZIP includes the app, required Java libraries, demo files and its setup guide. Install Java 21 before launching.
 
 For a client running the source project in an existing NetBeans installation, use [Client local setup](docs/client-local-setup.md). `Client-Setup.cmd` creates a separate seeded local server without the PC's existing MySQL password; `Start-SmartHire-NetBeans.cmd` starts it after reboot and opens the installed IDE. These source-project commands are included when downloading **Code > Download ZIP** or cloning the repository. Reset is explicit: `Client-Setup.cmd --reset`.
 

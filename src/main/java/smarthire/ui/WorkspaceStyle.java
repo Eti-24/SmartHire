@@ -33,18 +33,16 @@ import javax.swing.table.DefaultTableCellRenderer;
 
 final class WorkspaceStyle {
     static final Color NAVY = new Color(22, 40, 61);
-    static final Color WORKSPACE = new Color(240, 246, 247);
-    static final Color TEAL = new Color(0, 112, 119);
+    static final Color WORKSPACE = new Color(226, 233, 241);
+    static final Color TEAL = new Color(0, 100, 108);
     static final Color INK = new Color(23, 43, 61);
     static final Color MUTED = new Color(77, 96, 113);
     static final Color LINE = new Color(216, 226, 234);
     static final Color DANGER = new Color(156, 37, 42);
-    static final Color BLUE = new Color(38, 83, 159);
-    static final Color VIOLET = new Color(103, 66, 161);
-    static final Color AMBER = new Color(139, 87, 10);
+    static final Color BLUE = new Color(30, 64, 138);
+    static final Color VIOLET = new Color(91, 43, 143);
+    static final Color AMBER = new Color(139, 75, 7);
     static final Color[] ACCENTS = {TEAL, BLUE, VIOLET, AMBER};
-    static final Color[] TINTS = {new Color(220, 245, 239), new Color(227, 237, 255),
-            new Color(239, 229, 252), new Color(255, 241, 211)};
 
     static int sectionAccent(String section) {
         return switch (section) {
@@ -69,16 +67,20 @@ final class WorkspaceStyle {
         UIManager.put("Panel.background", WORKSPACE);
         UIManager.put("Label.foreground", INK);
         UIManager.put("ButtonUI", WorkspaceButtonUI.class.getName());
-        UIManager.put("Button.background", new Color(232, 242, 243));
-        UIManager.put("Button.foreground", INK);
+        UIManager.put("Button.background", BLUE);
+        UIManager.put("Button.foreground", Color.WHITE);
         UIManager.put("Button.disabledText", MUTED);
         UIManager.put("Button.border", new javax.swing.plaf.BorderUIResource.EmptyBorderUIResource(8, 12, 8, 12));
         UIManager.put("TextField.background", Color.WHITE);
         UIManager.put("PasswordField.background", Color.WHITE);
-        UIManager.put("TextField.selectionBackground", new Color(196, 232, 230));
-        UIManager.put("PasswordField.selectionBackground", new Color(196, 232, 230));
-        UIManager.put("TabbedPane.selected", Color.WHITE);
-        UIManager.put("TabbedPane.background", TINTS[1]);
+        UIManager.put("TextField.selectionBackground", TEAL);
+        UIManager.put("TextField.selectionForeground", Color.WHITE);
+        UIManager.put("PasswordField.selectionBackground", TEAL);
+        UIManager.put("PasswordField.selectionForeground", Color.WHITE);
+        UIManager.put("TabbedPane.selected", NAVY);
+        UIManager.put("TabbedPane.background", BLUE);
+        UIManager.put("TabbedPane.foreground", Color.WHITE);
+        UIManager.put("TabbedPane.selectedForeground", Color.WHITE);
         UIManager.put("TabbedPane.contentAreaColor", Color.WHITE);
         UIManager.put("ToolTip.background", new Color(235, 247, 246));
         UIManager.put("ToolTip.foreground", INK);
@@ -215,10 +217,10 @@ final class WorkspaceStyle {
         table.setIntercellSpacing(new Dimension(0, 1));
         table.setShowVerticalLines(false);
         table.setGridColor(LINE);
-        table.setSelectionBackground(new Color(210, 236, 236));
-        table.setSelectionForeground(INK);
-        table.getTableHeader().setBackground(TINTS[1]);
-        table.getTableHeader().setForeground(NAVY);
+        table.setSelectionBackground(TEAL);
+        table.setSelectionForeground(Color.WHITE);
+        table.getTableHeader().setBackground(BLUE);
+        table.getTableHeader().setForeground(Color.WHITE);
         table.getTableHeader().setFont(table.getFont().deriveFont(Font.BOLD, 13f));
         table.getTableHeader().setPreferredSize(new Dimension(0, 36));
         table.setFillsViewportHeight(true);
@@ -234,7 +236,7 @@ final class WorkspaceStyle {
             @Override public Component getTableCellRendererComponent(JTable table, Object value, boolean selected,
                     boolean focused, int row, int column) {
                 super.getTableCellRendererComponent(table, value, selected, focused, row, column);
-                setForeground(statusInk(String.valueOf(value)));
+                setForeground(selected ? Color.WHITE : statusInk(String.valueOf(value)));
                 setFont(table.getFont().deriveFont(Font.BOLD));
                 return this;
             }
